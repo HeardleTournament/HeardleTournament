@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <h1 style="text-align: center;">Xenoblade Heardle</h1>
+        <h1 style="text-align: center;">Heardle Tournament</h1>
 
         <div class="menu-container">
             <h2>Choose Game Mode</h2>
