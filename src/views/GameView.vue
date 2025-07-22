@@ -65,6 +65,22 @@ onMounted(async () => {
       console.log('Loading default playlist')
       await audioStore.loadPlaylistFromYouTube()
     }
+
+    // Start tournament if configuration is provided
+    if (playerName && tournamentName && songCount) {
+      const tournamentConfig = {
+        playerName: playerName.trim(),
+        tournamentName: tournamentName.trim(),
+        totalRounds: parseInt(songCount) || 10
+      }
+
+      console.log('Starting tournament:', tournamentConfig)
+      heardleStore.startTournament(tournamentConfig)
+    } else {
+      // Start a single random game if no tournament config
+      console.log('Starting single random game')
+      heardleStore.startRandomGame()
+    }
   } catch (error) {
     console.error('Error loading playlist:', error)
     // Fallback to default playlist if custom playlist fails
@@ -72,6 +88,17 @@ onMounted(async () => {
       console.log('Falling back to default playlist')
       try {
         await audioStore.loadPlaylistFromYouTube()
+        // Still try to start tournament/game after fallback
+        if (playerName && tournamentName && songCount) {
+          const tournamentConfig = {
+            playerName: playerName.trim(),
+            tournamentName: tournamentName.trim(),
+            totalRounds: parseInt(songCount) || 10
+          }
+          heardleStore.startTournament(tournamentConfig)
+        } else {
+          heardleStore.startRandomGame()
+        }
       } catch (fallbackError) {
         console.error('Error loading fallback playlist:', fallbackError)
       }
