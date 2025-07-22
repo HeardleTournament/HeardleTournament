@@ -6,7 +6,7 @@
                 ← Return to Menu
             </button>
         </div>
-        
+
         <h1 style="text-align: center;">Xenoblade Heardle</h1>
 
         <!-- Single Player Mode -->
@@ -108,7 +108,7 @@ onMounted(() => {
         text-align: center;
         margin-bottom: 20px;
     }
-    
+
     .return-menu-btn {
         font-size: 12px;
         padding: 8px 16px;
