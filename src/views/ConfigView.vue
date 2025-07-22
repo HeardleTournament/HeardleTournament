@@ -61,14 +61,19 @@
         <!-- Number of Songs -->
         <div class="form-group">
           <label for="songCount">Number of Songs</label>
-          <select id="songCount" v-model="songCount" class="form-select">
-            <option value="5">5 Songs</option>
-            <option value="10">10 Songs</option>
-            <option value="15">15 Songs</option>
-            <option value="20">20 Songs</option>
-            <option value="25">25 Songs</option>
-          </select>
-          <p class="form-hint">How many songs will be played in this tournament</p>
+          <input type="number" id="songCount" v-model.number="songCount"
+            :disabled="!playlistUrl || playlistUrl.trim() === ''" :min="1" :max="maxSongs"
+            placeholder="Enter number of songs" class="form-input"
+            :class="{ 'disabled': !playlistUrl || playlistUrl.trim() === '' }" />
+          <p class="form-hint" v-if="!playlistUrl || playlistUrl.trim() === ''">
+            Please select a playlist first
+          </p>
+          <p class="form-hint" v-else-if="maxSongs > 0">
+            Choose between 1 and {{ maxSongs }} songs (playlist size)
+          </p>
+          <p class="form-hint" v-else>
+            How many songs will be played in this tournament
+          </p>
         </div>
 
         <!-- Start Game Button -->
@@ -83,7 +88,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getXenobladePlaylistUrl } from '@/utils/env'
 
@@ -103,7 +108,8 @@ interface PredefinedPlaylist {
 const playerName = ref('')
 const tournamentName = ref('')
 const playlistUrl = ref('')
-const songCount = ref('10')
+const songCount = ref<number>(10)
+const maxSongs = ref<number>(0)
 
 // Predefined playlists state
 const showPredefined = ref(false)
@@ -123,13 +129,47 @@ const predefinedPlaylists = ref<PredefinedPlaylist[]>([
 const selectPredefinedPlaylist = (playlist: PredefinedPlaylist) => {
   playlistUrl.value = playlist.url
   showPredefined.value = false
+
+  // Set estimated max songs based on the playlist
+  if (playlist.id === 'xenoblade') {
+    maxSongs.value = 50 // Estimated for Xenoblade playlist
+  } else {
+    maxSongs.value = 25 // Default estimate for other playlists
+  }
+
+  // Reset song count to a reasonable default if it exceeds max
+  if (songCount.value > maxSongs.value) {
+    songCount.value = Math.min(10, maxSongs.value)
+  }
 }
+
+// Watch for manual playlist URL changes
+watch(playlistUrl, (newUrl) => {
+  if (newUrl && newUrl.trim() !== '') {
+    // For manual URLs, we can't know the exact size, so set a reasonable default
+    maxSongs.value = 100 // Conservative estimate for manual playlists
+  } else {
+    maxSongs.value = 0
+    songCount.value = 10
+  }
+})
 
 const returnToMenu = () => {
   router.push('/')
 }
 
 const startGame = () => {
+  // Validate song count
+  if (songCount.value < 1) {
+    alert('Number of songs must be at least 1')
+    return
+  }
+
+  if (maxSongs.value > 0 && songCount.value > maxSongs.value) {
+    alert(`Number of songs cannot exceed ${maxSongs.value} (playlist size)`)
+    return
+  }
+
   // For now, just navigate to the game
   // Later this will pass the configuration parameters
   console.log('Starting game with config:', {
@@ -146,7 +186,7 @@ const startGame = () => {
       playerName: playerName.value,
       tournamentName: tournamentName.value,
       playlistUrl: playlistUrl.value,
-      songCount: songCount.value
+      songCount: songCount.value.toString()
     }
   })
 }
@@ -246,6 +286,20 @@ const startGame = () => {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-input.disabled,
+.form-input:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+  border-color: #dee2e6;
+}
+
+.form-input.disabled:focus,
+.form-input:disabled:focus {
+  border-color: #dee2e6;
+  box-shadow: none;
 }
 
 .form-hint {
