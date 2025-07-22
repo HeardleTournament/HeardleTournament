@@ -57,6 +57,7 @@ export const useHeardleStore = defineStore('heardle', () => {
   const tournamentScore = ref(0)
   const isTournamentComplete = ref(false)
   const usedTrackIds = ref<Set<string>>(new Set())
+  const currentRoundCompleted = ref(false)
 
   // Get audio player store
   const audioStore = useAudioPlayerStore()
@@ -109,9 +110,16 @@ export const useHeardleStore = defineStore('heardle', () => {
 
   // Actions
   const startNewGame = async (track: Track) => {
-    // Save previous game to history if it exists
+    // Save previous game to appropriate storage if it exists
     if (currentTrack.value) {
-      saveGameToHistory()
+      if (isTournamentMode.value) {
+        console.log('startNewGame: Previous game found in tournament mode - calling completeRound')
+        // In tournament mode, save to round results
+        completeRound()
+      } else {
+        // In regular mode, save to game history
+        saveGameToHistory()
+      }
     }
 
     // Clear any active timers
@@ -137,6 +145,7 @@ export const useHeardleStore = defineStore('heardle', () => {
     isPlaying.value = false
     currentClipDuration.value = HEARDLE_CLIP_DURATIONS[0]
     showAnswer.value = false
+    currentRoundCompleted.value = false // Reset round completion flag
 
     // Load the track in the audio player
     try {
@@ -249,8 +258,11 @@ export const useHeardleStore = defineStore('heardle', () => {
       score.value = (maxAttempts.value - attempts.value.length + 1) * 100
       showAnswer.value = true
 
+      console.log('Player won the round!')
+
       // Handle tournament round completion
       if (isTournamentMode.value) {
+        console.log('Tournament mode - calling completeRound for WIN')
         completeRound()
       }
     } else if (attempts.value.length >= maxAttempts.value) {
@@ -258,8 +270,11 @@ export const useHeardleStore = defineStore('heardle', () => {
       isGameOver.value = true
       showAnswer.value = true
 
+      console.log('Player lost the round (no more attempts)')
+
       // Handle tournament round completion
       if (isTournamentMode.value) {
+        console.log('Tournament mode - calling completeRound for LOSS')
         completeRound()
       }
     } else {
@@ -289,8 +304,11 @@ export const useHeardleStore = defineStore('heardle', () => {
       isGameOver.value = true
       showAnswer.value = true
 
+      console.log('Player skipped all attempts - game over')
+
       // Handle tournament round completion
       if (isTournamentMode.value) {
+        console.log('Tournament mode - calling completeRound for SKIP LOSS')
         completeRound()
       }
     } else {
@@ -304,6 +322,13 @@ export const useHeardleStore = defineStore('heardle', () => {
 
   const revealAnswer = () => {
     showAnswer.value = true
+    isGameOver.value = true
+
+    // Handle tournament round completion if giving up
+    if (isTournamentMode.value && !hasWon.value) {
+      console.log('revealAnswer called in tournament mode - completing round')
+      completeRound()
+    }
   }
 
   const playFullSong = async () => {
@@ -361,6 +386,7 @@ export const useHeardleStore = defineStore('heardle', () => {
     tournamentScore.value = 0
     isTournamentComplete.value = false
     usedTrackIds.value.clear()
+    currentRoundCompleted.value = false
 
     // Start the first round
     startNextRound()
@@ -369,8 +395,14 @@ export const useHeardleStore = defineStore('heardle', () => {
   const startNextRound = async () => {
     if (!isTournamentMode.value || !tournamentConfig.value) return
 
+    console.log('startNextRound called:', {
+      currentRound: currentRound.value,
+      totalRounds: tournamentConfig.value.totalRounds,
+    })
+
     // Check if tournament is complete
     if (currentRound.value >= tournamentConfig.value.totalRounds) {
+      console.log('Tournament already complete in startNextRound')
       completeTournament()
       return
     }
@@ -388,11 +420,35 @@ export const useHeardleStore = defineStore('heardle', () => {
     usedTrackIds.value.add(randomTrack.id)
 
     currentRound.value++
+    console.log('Starting round:', currentRound.value, 'with track:', randomTrack.title)
     await startNewGame(randomTrack)
   }
 
   const completeRound = () => {
-    if (!isTournamentMode.value || !currentTrack.value) return
+    console.log('completeRound called with state:', {
+      isTournamentMode: isTournamentMode.value,
+      hasCurrentTrack: !!currentTrack.value,
+      alreadyCompleted: currentRoundCompleted.value,
+      currentRound: currentRound.value,
+      totalRounds: tournamentConfig.value?.totalRounds,
+      hasWon: hasWon.value,
+      currentTrack: currentTrack.value?.title,
+    })
+
+    if (!isTournamentMode.value || !currentTrack.value) {
+      console.log('completeRound: skipping - not in tournament mode or no current track')
+      return
+    }
+
+    if (currentRoundCompleted.value) {
+      console.log('completeRound: skipping - round already completed')
+      return
+    }
+
+    console.log('completeRound: proceeding to save round result')
+
+    // Mark this round as completed to prevent duplicate calls
+    currentRoundCompleted.value = true
 
     // Save round result
     const roundResult: RoundResult = {
@@ -406,8 +462,12 @@ export const useHeardleStore = defineStore('heardle', () => {
     roundResults.value.push(roundResult)
     tournamentScore.value += score.value
 
+    console.log('Round result saved:', roundResult)
+    console.log('Total round results so far:', roundResults.value.length)
+
     // Check if this was the last round
     if (currentRound.value >= (tournamentConfig.value?.totalRounds || 0)) {
+      console.log('Tournament complete - calling completeTournament()')
       completeTournament()
     }
   }
@@ -421,6 +481,20 @@ export const useHeardleStore = defineStore('heardle', () => {
       wins: tournamentWins.value,
       averageScore: tournamentAverageScore.value,
     })
+  }
+
+  const resetTournament = () => {
+    isTournamentMode.value = false
+    tournamentConfig.value = null
+    currentRound.value = 0
+    roundResults.value = []
+    tournamentScore.value = 0
+    isTournamentComplete.value = false
+    usedTrackIds.value.clear()
+    currentRoundCompleted.value = false
+
+    // Also reset the current game state
+    resetGame()
   }
 
   const resetGame = () => {
@@ -529,6 +603,7 @@ export const useHeardleStore = defineStore('heardle', () => {
     startNextRound,
     completeRound,
     completeTournament,
+    resetTournament,
 
     // Constants
     HEARDLE_CLIP_DURATIONS,

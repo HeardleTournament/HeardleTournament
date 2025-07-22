@@ -176,10 +176,14 @@
 
             <!-- Tournament Actions -->
             <div v-if="heardleStore.isTournamentMode" class="tournament-actions">
-              <button v-if="!heardleStore.isTournamentComplete" @click="nextTournamentRound" class="next-round-btn">
+              <button
+                v-if="!heardleStore.isTournamentComplete && heardleStore.currentRound < (heardleStore.tournamentConfig?.totalRounds || 0)"
+                @click="nextTournamentRound" class="next-round-btn">
                 ⏭️ Next Round ({{ heardleStore.currentRound + 1 }}/{{ heardleStore.tournamentConfig?.totalRounds }})
               </button>
-              <button v-else @click="completeTournament" class="tournament-complete-btn">
+              <button
+                v-else-if="heardleStore.isTournamentComplete || heardleStore.currentRound >= (heardleStore.tournamentConfig?.totalRounds || 0)"
+                @click="completeTournament" class="tournament-complete-btn">
                 🏆 View Tournament Results
               </button>
             </div>
@@ -235,10 +239,12 @@
 
 <script lang="ts" setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHeardleStore } from '@/stores/heardleStore'
 import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
 import SmartGuessInput from './SmartGuessInput.vue'
 
+const router = useRouter()
 const heardleStore = useHeardleStore()
 const audioStore = useAudioPlayerStore()
 
@@ -309,10 +315,26 @@ const nextTournamentRound = async () => {
 }
 
 const completeTournament = () => {
-  // This will be handled by the store and could redirect to results view
+  console.log('completeTournament called, current tournament state:', {
+    isTournamentMode: heardleStore.isTournamentMode,
+    isTournamentComplete: heardleStore.isTournamentComplete,
+    currentRound: heardleStore.currentRound,
+    totalRounds: heardleStore.tournamentConfig?.totalRounds,
+    roundResults: heardleStore.roundResults.length
+  })
+
+  // Complete the tournament in the store
   heardleStore.completeTournament()
-  // For now, just show a simple alert with tournament results
-  alert(`Tournament Complete!\nTotal Score: ${heardleStore.tournamentScore}\nWins: ${heardleStore.tournamentWins}/${heardleStore.tournamentConfig?.totalRounds || 0}`)
+
+  console.log('After completeTournament, state:', {
+    isTournamentComplete: heardleStore.isTournamentComplete,
+    roundResults: heardleStore.roundResults.length
+  })
+
+  // Add a small delay to ensure state is updated before navigation
+  setTimeout(() => {
+    router.push('/results')
+  }, 100)
 }
 </script>
 
