@@ -1,6 +1,37 @@
-# HeardleTournament
+# Xenoblade Heardle
 
-This template should help get you started developing with Vue 3 in Vite.
+A Heardle-style music guessing game featuring songs from the Xenoblade Chronicles series.
+
+## About
+
+Xenoblade Heardle is a web-based music guessing game where players try to identify Xenoblade Chronicles songs from short audio clips. Players get progressively longer clips with each wrong guess or skip, with the goal of identifying the song in as few attempts as possible.
+
+## Features
+
+- 🎵 Single-player Heardle gameplay
+- 🎮 Progressive audio clip lengths (1s → 2s → 4s → 7s → 11s → 16s)
+- 🎯 Smart search with song and artist suggestions
+- 📊 Statistics tracking (games played, win rate, average score)
+- 🔊 Volume control with mute functionality
+- 📱 Responsive design for mobile and desktop
+
+## How to Play
+
+1. Click "Start Random Game" to begin
+2. Listen to the short audio clip
+3. Type to search for the song title or artist
+4. Make your guess or skip to hear more of the song
+5. Try to guess the song in as few attempts as possible!
+
+## Technical Details
+
+Built with:
+
+- Vue 3 + TypeScript
+- Vite for build tooling
+- Pinia for state management
+- YouTube API for audio playback
+- PicoCSS for styling
 
 ## Recommended IDE Setup
 
