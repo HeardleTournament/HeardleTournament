@@ -36,6 +36,28 @@
           </p>
         </div>
 
+        <!-- Predefined Playlists -->
+        <div class="form-group">
+          <div class="predefined-playlists">
+            <button type="button" class="predefined-toggle" @click="showPredefined = !showPredefined">
+              {{ showPredefined ? '▼' : '▶' }} Or choose from predefined playlists
+            </button>
+
+            <div v-if="showPredefined" class="predefined-menu">
+              <div class="predefined-item" v-for="playlist in predefinedPlaylists" :key="playlist.id">
+                <button type="button" class="predefined-btn" @click="selectPredefinedPlaylist(playlist)"
+                  :class="{ 'selected': playlistUrl === playlist.url }">
+                  <div class="playlist-info">
+                    <h4>{{ playlist.name }}</h4>
+                    <p>{{ playlist.description }}</p>
+                    <span class="playlist-meta">{{ playlist.songCount }} songs • {{ playlist.genre }}</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Number of Songs -->
         <div class="form-group">
           <label for="songCount">Number of Songs</label>
@@ -63,14 +85,45 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { getXenobladePlaylistUrl } from '@/utils/env'
 
 const router = useRouter()
+
+// Interface for predefined playlists
+interface PredefinedPlaylist {
+  id: string
+  name: string
+  description: string
+  url: string
+  songCount: string
+  genre: string
+}
 
 // Form data
 const playerName = ref('')
 const tournamentName = ref('')
 const playlistUrl = ref('')
 const songCount = ref('10')
+
+// Predefined playlists state
+const showPredefined = ref(false)
+
+// Predefined playlists data
+const predefinedPlaylists = ref<PredefinedPlaylist[]>([
+  {
+    id: 'xenoblade',
+    name: 'Xenoblade Chronicles',
+    description: 'Epic orchestral soundtrack from the Xenoblade Chronicles series',
+    url: getXenobladePlaylistUrl(),
+    songCount: '50+',
+    genre: 'Video Game OST'
+  }
+])
+
+const selectPredefinedPlaylist = (playlist: PredefinedPlaylist) => {
+  playlistUrl.value = playlist.url
+  showPredefined.value = false
+}
 
 const returnToMenu = () => {
   router.push('/')
@@ -204,6 +257,84 @@ const startGame = () => {
 
 .form-hint strong {
   color: #2c3e50;
+}
+
+.predefined-playlists {
+  margin-top: 1rem;
+}
+
+.predefined-toggle {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 8px 0;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.predefined-toggle:hover {
+  color: #5a6fd8;
+}
+
+.predefined-menu {
+  margin-top: 1rem;
+  border: 2px solid #e0e6ed;
+  border-radius: 10px;
+  background: #f8f9fa;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.predefined-item {
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.predefined-item:last-child {
+  border-bottom: none;
+}
+
+.predefined-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 1rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+.predefined-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.predefined-btn.selected {
+  background: rgba(102, 126, 234, 0.2);
+  border-left: 4px solid #667eea;
+}
+
+.playlist-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.playlist-info p {
+  margin: 0 0 0.5rem 0;
+  color: #6c757d;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.playlist-meta {
+  font-size: 0.75rem;
+  color: #adb5bd;
+  font-weight: 500;
 }
 
 .form-actions {
