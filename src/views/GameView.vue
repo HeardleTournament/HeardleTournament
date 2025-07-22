@@ -29,11 +29,15 @@ import { useRouter } from 'vue-router'
 import HeardleGame from '@/components/HeardleGame.vue'
 import YouTubeAudioPlayer from '@/components/YouTubeAudioPlayer.vue'
 import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
+import { useHeardleStore } from '@/stores/heardleStore'
 
 const router = useRouter()
 const audioStore = useAudioPlayerStore()
+const heardleStore = useHeardleStore()
 
 const returnToMenu = () => {
+    // Reset the game state before going back to menu
+    heardleStore.resetGame()
     router.push('/')
 }
 
