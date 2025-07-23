@@ -82,10 +82,8 @@ const getPlayerTotalScore = (playerId: string): number => {
 }
 
 const getPlayerWins = (playerId: string): number => {
-    // This would need to be tracked during the game
-    // For now, we'll estimate based on score
-    const totalScore = getPlayerTotalScore(playerId)
-    return Math.floor(totalScore / 1000) // Rough estimate: 1000+ points = 1 win
+    if (!gameState.value) return 0
+    return gameState.value.playerGuesses[playerId]?.roundsWon || 0
 }
 
 const getMedal = (position: number): string => {

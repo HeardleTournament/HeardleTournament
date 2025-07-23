@@ -24,6 +24,7 @@ interface MultiplayerGameState {
       hasLost: boolean
       roundScore: number
       totalScore: number
+      roundsWon: number
     }
   }
 }
@@ -418,6 +419,7 @@ class LobbyService {
           hasLost: false,
           roundScore: 0,
           totalScore: 0,
+          roundsWon: 0,
         }
       })
 

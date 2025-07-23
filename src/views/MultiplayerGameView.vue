@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                    }}</span>
+                        }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -452,6 +452,11 @@ const nextRound = async () => {
         // Reset for next round
         const updatedPlayerGuesses = { ...gameState.value?.playerGuesses }
         Object.keys(updatedPlayerGuesses).forEach(playerId => {
+            // Increment roundsWon for players who won this round before resetting
+            if (updatedPlayerGuesses[playerId].hasWon) {
+                updatedPlayerGuesses[playerId].roundsWon = (updatedPlayerGuesses[playerId].roundsWon || 0) + 1
+            }
+
             updatedPlayerGuesses[playerId] = {
                 ...updatedPlayerGuesses[playerId],
                 attempts: [],
@@ -483,12 +488,21 @@ const endTournament = async () => {
     if (!isHost.value) return
 
     try {
+        // Before ending, increment roundsWon for players who won the final round
+        const updatedPlayerGuesses = { ...gameState.value?.playerGuesses }
+        Object.keys(updatedPlayerGuesses).forEach(playerId => {
+            if (updatedPlayerGuesses[playerId].hasWon) {
+                updatedPlayerGuesses[playerId].roundsWon = (updatedPlayerGuesses[playerId].roundsWon || 0) + 1
+            }
+        })
+
         // Update game state to mark tournament as complete
         const result = await lobbyService.updateGameState({
             isRoundActive: false,
             currentTrack: null,
             roundStartTime: 0,
-            roundEndTime: null
+            roundEndTime: null,
+            playerGuesses: updatedPlayerGuesses
         })
 
         if (result.success) {
