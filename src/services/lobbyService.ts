@@ -1,6 +1,32 @@
 // Lobby service for multiplayer functionality
 // Uses localStorage for demo purposes (works locally only)
 
+interface MultiplayerGameState {
+  currentRound: number
+  currentTrack: {
+    id: string
+    title: string
+    artist?: string
+    youtubeId: string
+  } | null
+  currentAttempt: number
+  maxAttempts: number
+  clipDurations: number[]
+  currentClipDuration: number
+  isRoundActive: boolean
+  roundStartTime: number
+  roundEndTime: number | null
+  playersReady: { [playerId: string]: boolean }
+  playerGuesses: {
+    [playerId: string]: {
+      attempts: { guess: string; isCorrect: boolean; timestamp: number }[]
+      hasWon: boolean
+      roundScore: number
+      totalScore: number
+    }
+  }
+}
+
 interface LobbyData {
   id: string
   hostId: string
@@ -14,6 +40,7 @@ interface LobbyData {
   status: 'waiting' | 'playing' | 'finished'
   createdAt: number
   maxPlayers: number
+  gameState?: MultiplayerGameState
 }
 
 interface PlayerData {
@@ -284,15 +311,26 @@ class LobbyService {
       // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 300))
 
+      // Get fresh lobby data from storage to ensure we have the latest player list
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby) {
+        return { success: false, error: 'Lobby not found' }
+      }
+
+      console.log('updateGameSettings - players before update:', Object.keys(freshLobby.players))
+
       const updatedSettings = {
-        ...this.currentLobby.gameSettings,
+        ...freshLobby.gameSettings,
         ...settings,
       }
 
-      this.currentLobby.gameSettings = updatedSettings
-      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      // Update the fresh lobby data and save it
+      freshLobby.gameSettings = updatedSettings
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
       this.saveLobbiesStorage()
 
+      console.log('updateGameSettings - players after update:', Object.keys(freshLobby.players))
       console.log('Host updated game settings:', updatedSettings)
 
       return { success: true }
@@ -329,7 +367,161 @@ class LobbyService {
     }
     this.saveLobbiesStorage()
   }
+
+  // Start multiplayer game (host only)
+  async startGame(): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
+    }
+
+    if (this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can start game' }
+    }
+
+    try {
+      // Get fresh lobby data from storage to ensure we have the latest player list
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby) {
+        return { success: false, error: 'Lobby not found' }
+      }
+
+      // Check if all players are ready
+      const allReady = Object.values(freshLobby.players).every(
+        (player) => player.isReady || player.isHost,
+      )
+      if (!allReady) {
+        return { success: false, error: 'Not all players are ready' }
+      }
+
+      // Initialize game state
+      const gameState: MultiplayerGameState = {
+        currentRound: 1,
+        currentTrack: null,
+        currentAttempt: 0,
+        maxAttempts: 6,
+        clipDurations: [1, 2, 4, 7, 11, 16],
+        currentClipDuration: 1,
+        isRoundActive: false,
+        roundStartTime: 0,
+        roundEndTime: null,
+        playersReady: {},
+        playerGuesses: {},
+      }
+
+      // Initialize player states
+      Object.keys(freshLobby.players).forEach((playerId) => {
+        gameState.playersReady[playerId] = false
+        gameState.playerGuesses[playerId] = {
+          attempts: [],
+          hasWon: false,
+          roundScore: 0,
+          totalScore: 0,
+        }
+      })
+
+      freshLobby.status = 'playing'
+      freshLobby.gameState = gameState
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
+      this.saveLobbiesStorage()
+
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to start game' }
+    }
+  }
+
+  // Update player ready status for game
+  async updatePlayerReady(isReady: boolean): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
+    }
+
+    try {
+      // Get fresh lobby data from storage to ensure we have the latest player list
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby) {
+        return { success: false, error: 'Lobby not found' }
+      }
+
+      if (freshLobby.players[this.currentPlayerId]) {
+        freshLobby.players[this.currentPlayerId].isReady = isReady
+        this.currentLobby = freshLobby
+        this.lobbies.set(freshLobby.id, freshLobby)
+        this.saveLobbiesStorage()
+        return { success: true }
+      }
+      return { success: false, error: 'Player not found' }
+    } catch {
+      return { success: false, error: 'Failed to update ready status' }
+    }
+  }
+
+  // Submit player guess
+  async submitGuess(
+    guess: string,
+    isCorrect: boolean,
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId || !this.currentLobby.gameState) {
+      return { success: false, error: 'No active game' }
+    }
+
+    try {
+      const gameState = this.currentLobby.gameState
+      const playerState = gameState.playerGuesses[this.currentPlayerId]
+
+      if (!playerState) {
+        return { success: false, error: 'Player not found in game' }
+      }
+
+      // Add the attempt
+      playerState.attempts.push({
+        guess,
+        isCorrect,
+        timestamp: Date.now(),
+      })
+
+      if (isCorrect) {
+        playerState.hasWon = true
+        // Calculate score based on attempt number
+        const attemptNumber = playerState.attempts.length
+        const baseScore = 1000
+        const multiplier = Math.max(1, 7 - attemptNumber) // Higher score for fewer attempts
+        playerState.roundScore = baseScore * multiplier
+        playerState.totalScore += playerState.roundScore
+      }
+
+      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      this.saveLobbiesStorage()
+
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to submit guess' }
+    }
+  }
+
+  // Update game state (host only)
+  async updateGameState(
+    updates: Partial<MultiplayerGameState>,
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId || !this.currentLobby.gameState) {
+      return { success: false, error: 'No active game' }
+    }
+
+    if (this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can update game state' }
+    }
+
+    try {
+      Object.assign(this.currentLobby.gameState, updates)
+      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      this.saveLobbiesStorage()
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to update game state' }
+    }
+  }
 }
 
 export const lobbyService = new LobbyService()
-export type { LobbyData, PlayerData }
+export type { LobbyData, PlayerData, MultiplayerGameState }

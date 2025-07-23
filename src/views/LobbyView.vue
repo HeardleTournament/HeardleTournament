@@ -111,11 +111,11 @@
       </div>
 
       <div class="lobby-actions">
-        <button v-if="isHost" class="action-btn primary" disabled>
-          🚀 Start Game (Coming Soon)
+        <button v-if="isHost" class="action-btn primary" @click="startGame" :disabled="!canStartGame">
+          🚀 Start Game
         </button>
-        <button v-else class="action-btn secondary" disabled>
-          ✅ Ready Up (Coming Soon)
+        <button v-else class="action-btn secondary" @click="toggleReady" :class="{ 'ready': isCurrentPlayerReady }">
+          {{ isCurrentPlayerReady ? '✅ Ready' : '⏳ Ready Up' }}
         </button>
       </div>
     </div>
@@ -186,23 +186,47 @@ const isHost = computed(() => {
   return lobbyData.value?.hostId === currentPlayerId
 })
 
+const isCurrentPlayerReady = computed(() => {
+  const currentPlayerId = lobbyService.getCurrentPlayerId()
+  if (!currentPlayerId || !lobbyData.value) return false
+  return lobbyData.value.players[currentPlayerId]?.isReady || false
+})
+
+const canStartGame = computed(() => {
+  if (!lobbyData.value || !isHost.value) return false
+
+  // Check if we have a valid playlist
+  if (!editableSettings.value.playlistUrl || editableSettings.value.playlistUrl.trim() === '') {
+    return false
+  }
+
+  // Check if all non-host players are ready
+  const nonHostPlayers = Object.values(lobbyData.value.players).filter(p => !p.isHost)
+  if (nonHostPlayers.length === 0) return true // Host can start alone for testing
+
+  return nonHostPlayers.every(player => player.isReady)
+})
+
 // Watch for host status changes to start/stop polling
 watch(isHost, (newIsHost, oldIsHost) => {
   if (newIsHost && !oldIsHost) {
-    // Became host - stop polling
+    // Became host - switch to host polling (less frequent, only for player updates)
     if (settingsPollingInterval) {
       clearInterval(settingsPollingInterval)
-      settingsPollingInterval = null
-      console.log('Became host - stopped polling')
     }
+    settingsPollingInterval = setInterval(() => {
+      pollLobbyUpdatesForHost()
+    }, 3000) // Slower polling for host
+    console.log('Became host - started host polling')
   } else if (!newIsHost && oldIsHost) {
-    // No longer host - start polling
-    if (!settingsPollingInterval) {
-      settingsPollingInterval = setInterval(() => {
-        pollLobbyUpdates()
-      }, 2000)
-      console.log('No longer host - started polling')
+    // No longer host - switch to regular polling
+    if (settingsPollingInterval) {
+      clearInterval(settingsPollingInterval)
     }
+    settingsPollingInterval = setInterval(() => {
+      pollLobbyUpdates()
+    }, 2000)
+    console.log('No longer host - started regular polling')
   }
 })
 
@@ -333,22 +357,36 @@ const updateMaxSongs = async (url: string) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Add a small delay to ensure localStorage operations are complete
+  await new Promise(resolve => setTimeout(resolve, 50))
+
   // Get fresh lobby data from storage
   const currentLobby = lobbyService.getLobby(lobbyCode.value)
   if (currentLobby) {
     lobbyData.value = currentLobby
 
-    // Set up polling for lobby updates (every 2 seconds) - only for non-host players
+    // Set up polling for lobby updates - both host and players need polling
     // Use nextTick to ensure computed properties are updated
     nextTick(() => {
-      if (!isHost.value) {
+      if (isHost.value) {
+        // Do an immediate poll for the host to catch any players that might have joined
+        pollLobbyUpdatesForHost()
+
+        // Host polls more frequently initially, then reduces frequency
+        settingsPollingInterval = setInterval(() => {
+          pollLobbyUpdatesForHost()
+        }, 1000) // Start with faster polling
+        console.log('Started host polling for player updates')
+      } else {
+        // Do an immediate poll for non-host players
+        pollLobbyUpdates()
+
+        // Non-host players poll more frequently for settings and player updates
         settingsPollingInterval = setInterval(() => {
           pollLobbyUpdates()
-        }, 2000)
+        }, 1000) // Start with faster polling
         console.log('Started polling for non-host player')
-      } else {
-        console.log('Host detected - no polling needed')
       }
     })
   } else {
@@ -412,8 +450,20 @@ const updateSettings = async () => {
       })
 
       if (result.success) {
-        // Update local lobby data with fresh data from storage
-        lobbyData.value = lobbyService.refreshCurrentLobby()
+        // Update local lobby data selectively to preserve player list
+        const freshLobbyData = lobbyService.refreshCurrentLobby()
+
+        if (freshLobbyData && lobbyData.value) {
+          // Only update the game settings, preserve players and other data
+          lobbyData.value = {
+            ...lobbyData.value,
+            gameSettings: freshLobbyData.gameSettings
+          }
+        } else if (freshLobbyData) {
+          // Fallback: if no current lobby data, use fresh data
+          lobbyData.value = freshLobbyData
+        }
+
         showSettingsMessage('Settings updated successfully!', 'success')
 
         // Trigger a manual refresh for all players by updating localStorage timestamp
@@ -429,6 +479,45 @@ const updateSettings = async () => {
   }
 }
 
+const toggleReady = async () => {
+  const newReadyStatus = !isCurrentPlayerReady.value
+  const result = await lobbyService.updatePlayerReady(newReadyStatus)
+
+  if (result.success) {
+    // Refresh lobby data to show updated ready status, but preserve other data
+    const freshLobby = lobbyService.getLobby(lobbyCode.value)
+    if (freshLobby && lobbyData.value) {
+      // Only update the players data to preserve settings and other data
+      lobbyData.value = {
+        ...lobbyData.value,
+        players: freshLobby.players
+      }
+    } else if (freshLobby) {
+      // Fallback: if no current lobby data, use fresh data
+      lobbyData.value = freshLobby
+    }
+  } else {
+    console.error('Failed to update ready status:', result.error)
+  }
+}
+
+const startGame = async () => {
+  if (!isHost.value || !canStartGame.value) return
+
+  try {
+    const result = await lobbyService.startGame()
+
+    if (result.success) {
+      // Navigate to multiplayer game view
+      router.push(`/lobby/${lobbyCode.value}/game`)
+    } else {
+      showSettingsMessage(result.error || 'Failed to start game', 'error')
+    }
+  } catch {
+    showSettingsMessage('Error starting game', 'error')
+  }
+}
+
 // Poll for lobby updates (for non-host players only)
 const pollLobbyUpdates = () => {
   // Only poll if we're not the host
@@ -440,21 +529,90 @@ const pollLobbyUpdates = () => {
   const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
   if (freshLobbyData) {
     const previousLobbyData = lobbyData.value
-    lobbyData.value = freshLobbyData
 
-    // Check if settings have changed
-    if (previousLobbyData) {
-      const prevSettings = previousLobbyData.gameSettings
-      const newSettings = freshLobbyData.gameSettings
+    // Update lobby data selectively to avoid resetting player list
+    if (lobbyData.value) {
+      // Only update if there are actual changes to avoid unnecessary re-renders
+      const prevSettingsJson = JSON.stringify(previousLobbyData?.gameSettings || {})
+      const newSettingsJson = JSON.stringify(freshLobbyData.gameSettings || {})
+      const prevPlayersJson = JSON.stringify(previousLobbyData?.players || {})
+      const newPlayersJson = JSON.stringify(freshLobbyData.players || {})
 
-      if (JSON.stringify(prevSettings) !== JSON.stringify(newSettings)) {
-        console.log('Host updated game settings:', newSettings)
+      // Check if settings have changed
+      if (prevSettingsJson !== newSettingsJson) {
+        console.log('Host updated game settings:', freshLobbyData.gameSettings)
+
+        // Update only the game settings to preserve other data
+        lobbyData.value = {
+          ...lobbyData.value,
+          gameSettings: freshLobbyData.gameSettings
+        }
 
         // Trigger visual feedback for settings update
         settingsJustUpdated.value = true
         setTimeout(() => {
           settingsJustUpdated.value = false
         }, 2000)
+      }
+
+      // Check if players have changed
+      if (prevPlayersJson !== newPlayersJson) {
+        console.log('Player list updated')
+
+        // Update only the players data
+        lobbyData.value = {
+          ...lobbyData.value,
+          players: freshLobbyData.players
+        }
+      }
+    } else {
+      // First time - update everything
+      lobbyData.value = freshLobbyData
+    }
+  } else {
+    // Lobby no longer exists - redirect to multiplayer menu
+    console.log('Lobby no longer exists, redirecting...')
+    router.push('/multiplayer')
+  }
+}
+
+// Poll for lobby updates (for host - only player changes, not settings)
+const pollLobbyUpdatesForHost = () => {
+  // Only poll if we are the host
+  if (!isHost.value) {
+    return
+  }
+
+  // Use getLobby to get fresh data from localStorage instead of cached data
+  const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
+  if (freshLobbyData) {
+    const previousLobbyData = lobbyData.value
+
+    // Always update the players data for the host to ensure they see new players immediately
+    // This handles the case where players join while the host is already in the lobby
+    if (lobbyData.value) {
+      lobbyData.value = {
+        ...lobbyData.value,
+        players: freshLobbyData.players
+      }
+    } else {
+      lobbyData.value = freshLobbyData
+    }
+
+    // Log when player states change for debugging
+    if (previousLobbyData) {
+      const prevPlayers = Object.keys(previousLobbyData.players).length
+      const newPlayers = Object.keys(freshLobbyData.players).length
+
+      const prevPlayerStates = JSON.stringify(previousLobbyData.players)
+      const newPlayerStates = JSON.stringify(freshLobbyData.players)
+
+      if (prevPlayerStates !== newPlayerStates) {
+        console.log('Player states updated (ready status or new players)')
+
+        if (prevPlayers !== newPlayers) {
+          console.log(`Player count changed: ${prevPlayers} -> ${newPlayers}`)
+        }
       }
     }
   } else {
@@ -761,6 +919,10 @@ const pollLobbyUpdates = () => {
 .action-btn.secondary {
   background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
   color: white;
+}
+
+.action-btn.secondary.ready {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
 }
 
 .action-btn:disabled {
