@@ -123,9 +123,9 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import { firebaseLobbyService, type LobbyData, type PlayerData } from '@/services/firebaseLobbyService'
+import { firebaseLobbyService, type LobbyData } from '@/services/firebaseLobbyService'
 import { getXenobladePlaylistUrl, getYouTubeApiKey } from '@/utils/env'
 import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
 
@@ -161,9 +161,6 @@ const isLoadingPlaylist = ref(false)
 const lastKnownSettings = ref<string>('')
 const settingsJustUpdated = ref(false)
 
-// Polling interval for settings updates (for non-host players)
-const settingsPollingInterval = ref<number | null>(null)
-
 // Predefined playlists data
 const showPredefinedPlaylists = ref(false)
 const predefinedPlaylists = ref<PredefinedPlaylist[]>([
@@ -182,12 +179,12 @@ const playerCount = computed(() => players.value.length)
 const maxPlayers = computed(() => lobbyData.value?.maxPlayers || 8)
 const gameSettings = computed(() => lobbyData.value?.gameSettings)
 const isHost = computed(() => {
-  const currentPlayerId = lobbyService.getCurrentPlayerId()
+  const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
   return lobbyData.value?.hostId === currentPlayerId
 })
 
 const isCurrentPlayerReady = computed(() => {
-  const currentPlayerId = lobbyService.getCurrentPlayerId()
+  const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
   if (!currentPlayerId || !lobbyData.value) return false
   return lobbyData.value.players[currentPlayerId]?.isReady || false
 })
@@ -205,29 +202,6 @@ const canStartGame = computed(() => {
   if (nonHostPlayers.length === 0) return true // Host can start alone for testing
 
   return nonHostPlayers.every(player => player.isReady)
-})
-
-// Watch for host status changes to start/stop polling
-watch(isHost, (newIsHost, oldIsHost) => {
-  if (newIsHost && !oldIsHost) {
-    // Became host - switch to host polling (less frequent, only for player updates)
-    if (settingsPollingInterval.value) {
-      clearInterval(settingsPollingInterval.value)
-    }
-    settingsPollingInterval.value = setInterval(() => {
-      pollLobbyUpdatesForHost()
-    }, 3000) // Slower polling for host
-    console.log('Became host - started host polling')
-  } else if (!newIsHost && oldIsHost) {
-    // No longer host - switch to regular polling
-    if (settingsPollingInterval.value) {
-      clearInterval(settingsPollingInterval.value)
-    }
-    settingsPollingInterval.value = setInterval(() => {
-      pollLobbyUpdates()
-    }, 2000)
-    console.log('No longer host - started regular polling')
-  }
 })
 
 // Watch for game settings changes (for non-host players to see updates)
@@ -358,37 +332,33 @@ const updateMaxSongs = async (url: string) => {
 }
 
 onMounted(async () => {
-  // Add a small delay to ensure localStorage operations are complete
+  // Add a small delay to ensure operations are complete
   await new Promise(resolve => setTimeout(resolve, 50))
 
-  // Get fresh lobby data from storage
-  const currentLobby = lobbyService.getLobby(lobbyCode.value)
+  // Set up real-time listener for lobby updates
+  firebaseLobbyService.listenToLobby(lobbyCode.value, (updatedLobby) => {
+    if (updatedLobby) {
+      lobbyData.value = updatedLobby
+
+      // Handle navigation based on lobby status
+      if (updatedLobby.status === 'playing') {
+        console.log('Game started - navigating to game view')
+        router.push(`/lobby/${lobbyCode.value}/game`)
+      } else if (updatedLobby.status === 'finished') {
+        console.log('Tournament finished - navigating to results view')
+        router.push(`/lobby/${lobbyCode.value}/results`)
+      }
+    } else {
+      // Lobby no longer exists - redirect to multiplayer menu
+      console.log('Lobby no longer exists, redirecting...')
+      router.push('/multiplayer')
+    }
+  })
+
+  // Get initial lobby data
+  const currentLobby = firebaseLobbyService.getCurrentLobby()
   if (currentLobby) {
     lobbyData.value = currentLobby
-
-    // Set up polling for lobby updates - both host and players need polling
-    // Use nextTick to ensure computed properties are updated
-    nextTick(() => {
-      if (isHost.value) {
-        // Do an immediate poll for the host to catch any players that might have joined
-        pollLobbyUpdatesForHost()
-
-        // Host polls more frequently initially, then reduces frequency
-        settingsPollingInterval.value = setInterval(() => {
-          pollLobbyUpdatesForHost()
-        }, 1000) // Start with faster polling
-        console.log('Started host polling for player updates')
-      } else {
-        // Do an immediate poll for non-host players
-        pollLobbyUpdates()
-
-        // Non-host players poll more frequently for settings and player updates
-        settingsPollingInterval.value = setInterval(() => {
-          pollLobbyUpdates()
-        }, 1000) // Start with faster polling
-        console.log('Started polling for non-host player')
-      }
-    })
   } else {
     // Redirect if no valid lobby data
     router.push('/multiplayer')
@@ -402,37 +372,27 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  // Clean up polling interval
-  if (settingsPollingInterval.value) {
-    clearInterval(settingsPollingInterval.value)
-    settingsPollingInterval.value = null
-  }
+  // Clean up Firebase listeners
+  firebaseLobbyService.removeAllListeners()
 })
 
-// Also clean up when leaving route (ensures cleanup even if component doesn't unmount properly)
+// Also clean up when leaving route
 onBeforeRouteLeave(() => {
-  if (settingsPollingInterval.value) {
-    clearInterval(settingsPollingInterval.value)
-    settingsPollingInterval.value = null
-    console.log('Cleaned up polling interval on route leave')
-  }
+  firebaseLobbyService.removeAllListeners()
+  console.log('Cleaned up Firebase listeners on route leave')
 })
 
 const leaveLobby = async () => {
-  // Clean up polling before leaving
-  if (settingsPollingInterval.value) {
-    clearInterval(settingsPollingInterval.value)
-    settingsPollingInterval.value = null
-  }
-  await lobbyService.leaveLobby()
+  // Clean up listeners before leaving
+  firebaseLobbyService.removeAllListeners()
+  await firebaseLobbyService.leaveLobby()
   router.push('/multiplayer')
 }
 
 const getPlaylistLabel = (playlistUrl: string): string => {
-  const options = lobbyService.getPlaylistOptions()
-  const option = options.find(opt => opt.value === playlistUrl)
-  if (option) {
-    return option.label
+  const xenobladeUrl = getXenobladePlaylistUrl()
+  if (playlistUrl === xenobladeUrl) {
+    return 'Xenoblade Chronicles'
   }
   if (playlistUrl && playlistUrl.startsWith('http')) {
     return 'Custom Playlist'
@@ -457,35 +417,17 @@ const updateSettings = async () => {
     // If it's one of our predefined playlists, use it directly
     if (playlistUrl && playlistUrl !== 'custom') {
       // Update game settings in the lobby
-      const result = await lobbyService.updateGameSettings({
+      const success = await firebaseLobbyService.updateLobbySettings({
         tournamentName: editableSettings.value.tournamentName,
         totalRounds: Number(editableSettings.value.totalRounds),
         playlistUrl: playlistUrl
       })
 
-      if (result.success) {
-        // Update local lobby data selectively to preserve player list
-        const freshLobbyData = lobbyService.refreshCurrentLobby()
-
-        if (freshLobbyData && lobbyData.value) {
-          // Only update the game settings, preserve players and other data
-          lobbyData.value = {
-            ...lobbyData.value,
-            gameSettings: freshLobbyData.gameSettings
-          }
-        } else if (freshLobbyData) {
-          // Fallback: if no current lobby data, use fresh data
-          lobbyData.value = freshLobbyData
-        }
-
+      if (success) {
         showSettingsMessage('Settings updated successfully!', 'success')
-
-        // Trigger a manual refresh for all players by updating localStorage timestamp
-        localStorage.setItem('lobby-settings-updated', Date.now().toString())
-
-        console.log('Host updated settings - fresh lobby data:', lobbyData.value?.gameSettings)
+        console.log('Host updated settings successfully')
       } else {
-        showSettingsMessage(result.error || 'Failed to update settings', 'error')
+        showSettingsMessage('Failed to update settings', 'error')
       }
     }
   } catch {
@@ -495,23 +437,10 @@ const updateSettings = async () => {
 
 const toggleReady = async () => {
   const newReadyStatus = !isCurrentPlayerReady.value
-  const result = await lobbyService.updatePlayerReady(newReadyStatus)
+  const success = await firebaseLobbyService.setPlayerReady(newReadyStatus)
 
-  if (result.success) {
-    // Refresh lobby data to show updated ready status, but preserve other data
-    const freshLobby = lobbyService.getLobby(lobbyCode.value)
-    if (freshLobby && lobbyData.value) {
-      // Only update the players data to preserve settings and other data
-      lobbyData.value = {
-        ...lobbyData.value,
-        players: freshLobby.players
-      }
-    } else if (freshLobby) {
-      // Fallback: if no current lobby data, use fresh data
-      lobbyData.value = freshLobby
-    }
-  } else {
-    console.error('Failed to update ready status:', result.error)
+  if (!success) {
+    console.error('Failed to update ready status')
   }
 }
 
@@ -519,150 +448,16 @@ const startGame = async () => {
   if (!isHost.value || !canStartGame.value) return
 
   try {
-    const result = await lobbyService.startGame()
+    const success = await firebaseLobbyService.startGame()
 
-    if (result.success) {
-      // Navigate to multiplayer game view
-      router.push(`/lobby/${lobbyCode.value}/game`)
+    if (success) {
+      // Navigation will happen automatically via the listener
+      console.log('Game started successfully')
     } else {
-      showSettingsMessage(result.error || 'Failed to start game', 'error')
+      showSettingsMessage('Failed to start game', 'error')
     }
   } catch {
     showSettingsMessage('Error starting game', 'error')
-  }
-}
-
-// Poll for lobby updates (for non-host players only)
-const pollLobbyUpdates = () => {
-  // Only poll if we're not the host and still in a multiplayer route
-  if (isHost.value || !router.currentRoute.value.path.includes('/lobby/')) {
-    return
-  }
-
-  // Use getLobby to get fresh data from localStorage instead of cached data
-  const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
-  if (freshLobbyData) {
-    const previousLobbyData = lobbyData.value
-
-    // Check if the game has started (status changed to 'playing')
-    if (freshLobbyData.status === 'playing' && (!previousLobbyData || previousLobbyData.status !== 'playing')) {
-      console.log('Game started by host - navigating to game view')
-      router.push(`/lobby/${lobbyCode.value}/game`)
-      return
-    }
-
-    // Check if the tournament has finished (status changed to 'finished')
-    // Only redirect if this is a real-time status change, not when manually navigating back to lobby
-    if (freshLobbyData.status === 'finished' && previousLobbyData && previousLobbyData.status !== 'finished') {
-      console.log('Tournament finished - navigating to results view')
-      router.push(`/lobby/${lobbyCode.value}/results`)
-      return
-    }
-
-    // Update lobby data selectively to avoid resetting player list
-    if (lobbyData.value) {
-      // Only update if there are actual changes to avoid unnecessary re-renders
-      const prevSettingsJson = JSON.stringify(previousLobbyData?.gameSettings || {})
-      const newSettingsJson = JSON.stringify(freshLobbyData.gameSettings || {})
-      const prevPlayersJson = JSON.stringify(previousLobbyData?.players || {})
-      const newPlayersJson = JSON.stringify(freshLobbyData.players || {})
-
-      // Check if settings have changed
-      if (prevSettingsJson !== newSettingsJson) {
-        console.log('Host updated game settings:', freshLobbyData.gameSettings)
-
-        // Update only the game settings to preserve other data
-        lobbyData.value = {
-          ...lobbyData.value,
-          gameSettings: freshLobbyData.gameSettings
-        }
-
-        // Trigger visual feedback for settings update
-        settingsJustUpdated.value = true
-        setTimeout(() => {
-          settingsJustUpdated.value = false
-        }, 2000)
-      }
-
-      // Check if players have changed
-      if (prevPlayersJson !== newPlayersJson) {
-        console.log('Player list updated')
-
-        // Update only the players data
-        lobbyData.value = {
-          ...lobbyData.value,
-          players: freshLobbyData.players
-        }
-      }
-    } else {
-      // First time - update everything
-      lobbyData.value = freshLobbyData
-    }
-  } else {
-    // Lobby no longer exists - redirect to multiplayer menu
-    console.log('Lobby no longer exists, redirecting...')
-    router.push('/multiplayer')
-  }
-}
-
-// Poll for lobby updates (for host - only player changes, not settings)
-const pollLobbyUpdatesForHost = () => {
-  // Only poll if we are the host and still in a multiplayer route
-  if (!isHost.value || !router.currentRoute.value.path.includes('/lobby/')) {
-    return
-  }
-
-  // Use getLobby to get fresh data from localStorage instead of cached data
-  const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
-  if (freshLobbyData) {
-    const previousLobbyData = lobbyData.value
-
-    // Check if the game has started (status changed to 'playing') - this could happen if another host instance started the game
-    if (freshLobbyData.status === 'playing' && (!previousLobbyData || previousLobbyData.status !== 'playing')) {
-      console.log('Game started - navigating to game view')
-      router.push(`/lobby/${lobbyCode.value}/game`)
-      return
-    }
-
-    // Check if the tournament has finished (status changed to 'finished')
-    // Only redirect if this is a real-time status change, not when manually navigating back to lobby
-    if (freshLobbyData.status === 'finished' && previousLobbyData && previousLobbyData.status !== 'finished') {
-      console.log('Tournament finished - navigating to results view')
-      router.push(`/lobby/${lobbyCode.value}/results`)
-      return
-    }
-
-    // Always update the players data for the host to ensure they see new players immediately
-    // This handles the case where players join while the host is already in the lobby
-    if (lobbyData.value) {
-      lobbyData.value = {
-        ...lobbyData.value,
-        players: freshLobbyData.players
-      }
-    } else {
-      lobbyData.value = freshLobbyData
-    }
-
-    // Log when player states change for debugging
-    if (previousLobbyData) {
-      const prevPlayers = Object.keys(previousLobbyData.players).length
-      const newPlayers = Object.keys(freshLobbyData.players).length
-
-      const prevPlayerStates = JSON.stringify(previousLobbyData.players)
-      const newPlayerStates = JSON.stringify(freshLobbyData.players)
-
-      if (prevPlayerStates !== newPlayerStates) {
-        console.log('Player states updated (ready status or new players)')
-
-        if (prevPlayers !== newPlayers) {
-          console.log(`Player count changed: ${prevPlayers} -> ${newPlayers}`)
-        }
-      }
-    }
-  } else {
-    // Lobby no longer exists - redirect to multiplayer menu
-    console.log('Lobby no longer exists, redirecting...')
-    router.push('/multiplayer')
   }
 }
 </script>
