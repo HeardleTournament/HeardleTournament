@@ -3,7 +3,37 @@
     <!-- Game Header -->
     <div class="game-header">
       <div class="game-header">
-        <h2>🎵 Heardle Game</h2>
+        <!-- Tournament Progress (if in tournament mode) -->
+        <div v-if="heardleStore.isTournamentMode && heardleStore.tournamentConfig" class="tournament-info">
+          <h2>🏆 {{ heardleStore.tournamentConfig.tournamentName }}</h2>
+          <div class="tournament-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: `${heardleStore.tournamentProgress?.percentage || 0}%` }">
+              </div>
+            </div>
+            <div class="progress-text">
+              Round {{ heardleStore.currentRound }} of {{ heardleStore.tournamentConfig.totalRounds }}
+            </div>
+          </div>
+          <div class="tournament-stats">
+            <div class="tournament-stat">
+              <span class="stat-label">Player:</span>
+              <span class="stat-value">{{ heardleStore.tournamentConfig.playerName }}</span>
+            </div>
+            <div class="tournament-stat">
+              <span class="stat-label">Tournament Score:</span>
+              <span class="stat-value">{{ heardleStore.tournamentScore }}</span>
+            </div>
+            <div class="tournament-stat">
+              <span class="stat-label">Wins:</span>
+              <span class="stat-value">{{ heardleStore.tournamentWins }}/{{ heardleStore.currentRound - 1 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Regular Game Header (if not in tournament mode) -->
+        <h2 v-else>🎵 Heardle Game</h2>
+
         <div class="game-stats">
           <div class="stat">
             <span class="stat-label">Attempt:</span>
@@ -143,9 +173,27 @@
             <button @click="playFullSong" class="play-full-btn">
               🎵 Play Full Song
             </button>
-            <button @click="startRandomGame" class="new-game-btn">
-              🎲 New Random Game
-            </button>
+
+            <!-- Tournament Actions -->
+            <div v-if="heardleStore.isTournamentMode" class="tournament-actions">
+              <button
+                v-if="!heardleStore.isTournamentComplete && heardleStore.currentRound < (heardleStore.tournamentConfig?.totalRounds || 0)"
+                @click="nextTournamentRound" class="next-round-btn">
+                ⏭️ Next Round ({{ heardleStore.currentRound + 1 }}/{{ heardleStore.tournamentConfig?.totalRounds }})
+              </button>
+              <button
+                v-else-if="heardleStore.isTournamentComplete || heardleStore.currentRound >= (heardleStore.tournamentConfig?.totalRounds || 0)"
+                @click="completeTournament" class="tournament-complete-btn">
+                🏆 View Tournament Results
+              </button>
+            </div>
+
+            <!-- Non-Tournament Actions -->
+            <div v-else class="single-game-actions">
+              <button @click="startRandomGame" class="new-game-btn">
+                🎲 New Random Game
+              </button>
+            </div>
           </div>
 
           <!-- YouTube Video Player -->
@@ -191,10 +239,12 @@
 
 <script lang="ts" setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useHeardleStore } from '@/stores/heardleStore'
 import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
 import SmartGuessInput from './SmartGuessInput.vue'
 
+const router = useRouter()
 const heardleStore = useHeardleStore()
 const audioStore = useAudioPlayerStore()
 
@@ -255,6 +305,36 @@ const playFullSong = async () => {
 
   // Show the video player (iframe will autoplay)
   showVideoPlayer.value = true
+}
+
+// Tournament methods
+const nextTournamentRound = async () => {
+  showVideoPlayer.value = false
+  currentGuess.value = ''
+  await heardleStore.startNextRound()
+}
+
+const completeTournament = () => {
+  console.log('completeTournament called, current tournament state:', {
+    isTournamentMode: heardleStore.isTournamentMode,
+    isTournamentComplete: heardleStore.isTournamentComplete,
+    currentRound: heardleStore.currentRound,
+    totalRounds: heardleStore.tournamentConfig?.totalRounds,
+    roundResults: heardleStore.roundResults.length
+  })
+
+  // Complete the tournament in the store
+  heardleStore.completeTournament()
+
+  console.log('After completeTournament, state:', {
+    isTournamentComplete: heardleStore.isTournamentComplete,
+    roundResults: heardleStore.roundResults.length
+  })
+
+  // Add a small delay to ensure state is updated before navigation
+  setTimeout(() => {
+    router.push('/results')
+  }, 100)
 }
 </script>
 
@@ -662,23 +742,36 @@ const playFullSong = async () => {
 
 .end-game-actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.tournament-actions,
+.single-game-actions {
+  display: flex;
   justify-content: center;
   gap: 15px;
 }
 
 .play-full-btn,
-.new-game-btn {
-  background: #007bff;
-  color: white;
+.new-game-btn,
+.next-round-btn,
+.tournament-complete-btn {
   border: none;
   padding: 10px 20px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
+  font-weight: 500;
+  color: white;
 }
 
-.play-full-btn:hover,
-.new-game-btn:hover {
+.play-full-btn {
+  background: #007bff;
+}
+
+.play-full-btn:hover {
   background: #0056b3;
 }
 
@@ -688,6 +781,23 @@ const playFullSong = async () => {
 
 .new-game-btn:hover {
   background: #218838;
+}
+
+.next-round-btn {
+  background: #17a2b8;
+}
+
+.next-round-btn:hover {
+  background: #138496;
+}
+
+.tournament-complete-btn {
+  background: #ffc107;
+  color: #212529;
+}
+
+.tournament-complete-btn:hover {
+  background: #e0a800;
 }
 
 .game-statistics {

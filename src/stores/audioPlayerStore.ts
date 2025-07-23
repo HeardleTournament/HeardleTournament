@@ -396,6 +396,42 @@ export const useAudioPlayerStore = defineStore('audioPlayer', () => {
     }
   }
 
+  const loadCustomPlaylistFromYouTube = async (playlistUrl: string) => {
+    const playlistId = extractYouTubePlaylistId(playlistUrl)
+    if (!playlistId) {
+      throw new Error('Invalid YouTube playlist URL')
+    }
+
+    const apiKey = getYouTubeApiKey()
+    if (!apiKey) {
+      throw new Error('YouTube API key is not configured')
+    }
+
+    try {
+      isLoading.value = true
+      const playlistItems = await fetchPlaylistVideos(playlistId, apiKey)
+
+      // Convert YouTube playlist items to our Track format
+      const tracks: Track[] = playlistItems.map((item: YouTubePlaylistItem) => ({
+        id: item.videoId,
+        videoId: item.videoId,
+        title: item.title,
+        artist: item.channelTitle,
+      }))
+
+      // Replace current playlist
+      playlist.value = tracks
+      currentIndex.value = -1
+
+      return tracks
+    } catch (error) {
+      console.error('Error loading custom YouTube playlist:', error)
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   const setHeardleMode = (enabled: boolean) => {
     heardleMode.value = enabled
   }
@@ -459,6 +495,7 @@ export const useAudioPlayerStore = defineStore('audioPlayer', () => {
     clearPlaylist,
     loadPlaylistFromYouTube,
     addPlaylistFromYouTube,
+    loadCustomPlaylistFromYouTube,
     setHeardleMode,
     primePlayerForAutoplay,
   }

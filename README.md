@@ -1,4 +1,4 @@
-# Xenoblade Heardle
+# Heardle Tournament
 
 A Heardle-style music guessing game featuring songs from the Xenoblade Chronicles series.
 
