@@ -79,7 +79,7 @@
         <div v-if="statusMessage" class="status-message" :class="statusType">
             <div class="message-content">
                 <span class="message-icon">{{ statusType === 'success' ? '✅' : statusType === 'error' ? '❌' : 'ℹ️'
-                    }}</span>
+                }}</span>
                 <span class="message-text">{{ statusMessage }}</span>
             </div>
         </div>
@@ -105,7 +105,8 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { lobbyService } from '@/services/lobbyService'
+import { firebaseLobbyService } from '@/services/firebaseLobbyService'
+import { hasFirebaseConfig } from '@/utils/env'
 
 const router = useRouter()
 const lobbyCode = ref('')
@@ -170,7 +171,13 @@ const handleCreateLobby = async () => {
     showStatus('Creating lobby...', 'info')
 
     try {
-        const result = await lobbyService.createLobby(playerName.value.trim())
+        // Check if Firebase is configured
+        if (!hasFirebaseConfig()) {
+            showStatus('Firebase is not configured. Please check your environment variables.', 'error')
+            return
+        }
+
+        const result = await firebaseLobbyService.createLobby(playerName.value.trim())
 
         if (result.success && result.lobbyCode) {
             showStatus(`Lobby created! Code: ${result.lobbyCode}`, 'success')
@@ -195,7 +202,13 @@ const handleJoinLobby = async () => {
     showStatus('Joining lobby...', 'info')
 
     try {
-        const result = await lobbyService.joinLobby(lobbyCode.value, playerName.value.trim())
+        // Check if Firebase is configured
+        if (!hasFirebaseConfig()) {
+            showStatus('Firebase is not configured. Please check your environment variables.', 'error')
+            return
+        }
+
+        const result = await firebaseLobbyService.joinLobby(lobbyCode.value, playerName.value.trim())
 
         if (result.success) {
             showStatus('Successfully joined lobby!', 'success')

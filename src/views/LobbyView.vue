@@ -125,7 +125,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import { lobbyService, type LobbyData } from '@/services/lobbyService'
+import { firebaseLobbyService, type LobbyData, type PlayerData } from '@/services/firebaseLobbyService'
 import { getXenobladePlaylistUrl, getYouTubeApiKey } from '@/utils/env'
 import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
 

@@ -4,7 +4,7 @@ import GameView from './views/GameView.vue'
 import ConfigView from './views/ConfigView.vue'
 import TournamentResults from './views/TournamentResults.vue'
 import MultiplayerMenu from './views/MultiplayerMenu.vue'
-import LobbyView from './views/LobbyView.vue'
+import FirebaseLobbyView from './views/FirebaseLobbyView.vue'
 import MultiplayerGameView from './views/MultiplayerGameView.vue'
 import MultiplayerResultsView from './views/MultiplayerResultsView.vue'
 
@@ -39,7 +39,7 @@ const router = createRouter({
     {
       path: '/lobby/:lobbyCode',
       name: 'lobby',
-      component: LobbyView,
+      component: FirebaseLobbyView,
     },
     {
       path: '/lobby/:lobbyCode/game',

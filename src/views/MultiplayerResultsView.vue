@@ -53,7 +53,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { lobbyService, type LobbyData } from '@/services/lobbyService'
+import { firebaseLobbyService, type LobbyData } from '@/services/firebaseLobbyService'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,20 +98,15 @@ const getMedal = (position: number): string => {
 // Actions
 const backToLobby = async () => {
     // If the current user is the host, reset the lobby to allow a new tournament
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     const isCurrentUserHost = lobbyData.value?.hostId === currentPlayerId
 
     if (isCurrentUserHost) {
         console.log('Host is resetting lobby for new tournament')
-        const resetResult = await lobbyService.resetLobby()
-        if (resetResult.success) {
-            console.log('Lobby reset successful, navigating to lobby')
-            router.push(`/lobby/${lobbyCode.value}`)
-        } else {
-            console.error('Failed to reset lobby:', resetResult.error)
-            // Navigate anyway, let the lobby handle it
-            router.push(`/lobby/${lobbyCode.value}`)
-        }
+        // TODO: Implement lobby reset functionality in Firebase service
+        // For now, just navigate back to lobby
+        console.log('Navigating back to lobby')
+        router.push(`/lobby/${lobbyCode.value}`)
     } else {
         // Non-host players just navigate back
         router.push(`/lobby/${lobbyCode.value}`)
@@ -124,14 +119,14 @@ const backToMenu = () => {
 
 // Lifecycle
 onMounted(() => {
-    const freshLobby = lobbyService.getLobby(lobbyCode.value)
-    if (freshLobby) {
-        lobbyData.value = freshLobby
+    const currentLobby = firebaseLobbyService.getCurrentLobby()
+    if (currentLobby && currentLobby.id === lobbyCode.value) {
+        lobbyData.value = currentLobby
 
         // Check if tournament is actually finished
-        if (freshLobby.status !== 'finished') {
-            console.log('Tournament not finished, redirecting based on status:', freshLobby.status)
-            if (freshLobby.status === 'playing') {
+        if (currentLobby.status !== 'finished') {
+            console.log('Tournament not finished, redirecting based on status:', currentLobby.status)
+            if (currentLobby.status === 'playing') {
                 // Game is still active, redirect to game view
                 router.push(`/lobby/${lobbyCode.value}/game`)
             } else {

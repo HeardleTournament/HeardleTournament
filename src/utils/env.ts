@@ -18,8 +18,34 @@ export function hasYouTubeApiKey(): boolean {
   return !!import.meta.env.VITE_YOUTUBE_API_KEY
 }
 
-export function getXenobladePlaylistUrl(): string  {
+export function getXenobladePlaylistUrl(): string {
   return import.meta.env.VITE_XENO_PLAYLIST
+}
+
+/**
+ * Check if Firebase is configured
+ * @returns True if Firebase configuration is available
+ */
+export function hasFirebaseConfig(): boolean {
+  return !!(
+    import.meta.env.VITE_FIREBASE_API_KEY &&
+    import.meta.env.VITE_FIREBASE_DATABASE_URL &&
+    import.meta.env.VITE_FIREBASE_PROJECT_ID
+  )
+}
+
+/**
+ * Get Firebase configuration status
+ * @returns Object with Firebase configuration details
+ */
+export function getFirebaseConfigStatus() {
+  return {
+    hasApiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
+    hasDatabaseUrl: !!import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    hasProjectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    hasAuthDomain: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    isFullyConfigured: hasFirebaseConfig(),
+  }
 }
 
 /**
@@ -32,7 +58,9 @@ export function getEnvInfo() {
     dev: import.meta.env.DEV,
     prod: import.meta.env.PROD,
     hasApiKey: hasYouTubeApiKey(),
-    // Don't log the actual API key for security
+    hasFirebase: hasFirebaseConfig(),
+    // Don't log the actual API keys for security
     apiKeyConfigured: !!import.meta.env.VITE_YOUTUBE_API_KEY,
+    firebaseConfigured: hasFirebaseConfig(),
   }
 }

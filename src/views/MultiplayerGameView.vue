@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                    }}</span>
+                        }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -159,7 +159,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import { lobbyService, type LobbyData } from '@/services/lobbyService'
+import { firebaseLobbyService, type LobbyData, type MultiplayerGameState } from '@/services/firebaseLobbyService'
 import SmartGuessInput from '@/components/SmartGuessInput.vue'
 import YouTubeAudioPlayer from '@/components/YouTubeAudioPlayer.vue'
 import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
@@ -170,6 +170,21 @@ const router = useRouter()
 const route = useRoute()
 const audioStore = useAudioPlayerStore()
 
+// Navigation guard to prevent rapid navigation loops
+const lastNavigationTime = ref<number>(0)
+const NAVIGATION_THROTTLE_MS = 2000 // Prevent navigation calls within 2 seconds
+
+const safeNavigate = (path: string) => {
+    const now = Date.now()
+    if (now - lastNavigationTime.value < NAVIGATION_THROTTLE_MS) {
+        console.log('Navigation throttled, ignoring call to:', path)
+        return false
+    }
+    lastNavigationTime.value = now
+    router.push(path)
+    return true
+}
+
 // Reactive state
 const lobbyData = ref<LobbyData | null>(null)
 const currentGuess = ref('')
@@ -177,7 +192,6 @@ const isPlaying = ref(false)
 const isSubmittingGuess = ref(false)
 const isStartingRound = ref(false)
 const showTrackInfo = ref(false)
-const gamePollingInterval = ref<number | null>(null)
 
 // Computed properties
 const lobbyCode = computed(() => route.params.lobbyCode as string)
@@ -185,15 +199,16 @@ const gameState = computed(() => lobbyData.value?.gameState)
 const gameSettings = computed(() => lobbyData.value?.gameSettings)
 const players = computed(() => lobbyData.value ? Object.values(lobbyData.value.players) : [])
 const isHost = computed(() => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     return lobbyData.value?.hostId === currentPlayerId
 })
 
 // Game state helpers
 const getCurrentPlayerAttempts = () => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return 0
-    return gameState.value.playerGuesses[currentPlayerId]?.attempts.length || 0
+    const playerGuess = gameState.value.playerGuesses[currentPlayerId]
+    return playerGuess?.attempts?.length || 0
 }
 
 const getCurrentPlayerClipDuration = () => {
@@ -203,19 +218,19 @@ const getCurrentPlayerClipDuration = () => {
 }
 
 const hasCurrentPlayerWon = () => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return false
     return gameState.value.playerGuesses[currentPlayerId]?.hasWon || false
 }
 
 const hasCurrentPlayerFinishedRound = () => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return false
     return gameState.value.playerGuesses[currentPlayerId]?.hasLost || false
 }
 
 const isCurrentPlayerAttemptCorrect = (attemptIndex: number) => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return false
     const attempts = gameState.value.playerGuesses[currentPlayerId]?.attempts || []
     return attempts[attemptIndex]?.isCorrect || false
@@ -223,7 +238,8 @@ const isCurrentPlayerAttemptCorrect = (attemptIndex: number) => {
 
 const getPlayerAttempts = (playerId: string) => {
     if (!gameState.value) return 0
-    return gameState.value.playerGuesses[playerId]?.attempts.length || 0
+    const playerGuess = gameState.value.playerGuesses[playerId]
+    return playerGuess?.attempts?.length || 0
 }
 
 const hasPlayerWon = (playerId: string) => {
@@ -247,13 +263,37 @@ const getPlayerRoundScore = (playerId: string) => {
 }
 
 const areAllPlayersFinished = () => {
-    if (!gameState.value) return false
+    if (!gameState.value || !lobbyData.value) return false
 
-    // Check if all players have either won or lost
-    return Object.keys(gameState.value.playerGuesses).every(playerId => {
+    // Don't consider round finished if it's not active
+    if (!gameState.value.isRoundActive) return false
+
+    // Don't consider round finished if it just started (less than 2 seconds ago)
+    const timeSinceStart = Date.now() - gameState.value.roundStartTime
+    if (timeSinceStart < 2000) {
+        return false
+    }
+
+    // Check if all players in the lobby have either won or lost
+    const allPlayerIds = Object.keys(lobbyData.value.players)
+
+    const result = allPlayerIds.every(playerId => {
         const playerState = gameState.value!.playerGuesses[playerId]
-        return playerState.hasWon || playerState.hasLost
+        // If player doesn't have game state yet, they haven't finished
+        if (!playerState) return false
+
+        // For a round that just started, if all players have empty attempts,
+        // they definitely haven't finished yet
+        if (timeSinceStart < 5000 && playerState.attempts.length === 0) {
+            return false
+        }
+
+        // Player must have won or lost AND have at least attempted once (or reached max attempts)
+        return (playerState.hasWon || playerState.hasLost) &&
+            (playerState.attempts.length > 0 || playerState.hasLost)
     })
+
+    return result
 }
 
 const getNextClipDuration = () => {
@@ -295,9 +335,16 @@ const startRound = async () => {
             return
         }
 
-        // Select a random track
-        const randomIndex = Math.floor(Math.random() * playlistItems.length)
-        const selectedVideo = playlistItems[randomIndex]
+        // Get tracks that haven't been used yet
+        const usedTracks = gameState.value?.usedTracks || []
+        const availableTracks = playlistItems.filter(item => !usedTracks.includes(item.videoId))
+
+        // If all tracks have been used, reset the used tracks list
+        const tracksToChooseFrom = availableTracks.length > 0 ? availableTracks : playlistItems
+
+        // Select a random track from available tracks
+        const randomIndex = Math.floor(Math.random() * tracksToChooseFrom.length)
+        const selectedVideo = tracksToChooseFrom[randomIndex]
 
         const trackData = {
             id: selectedVideo.videoId,
@@ -306,17 +353,25 @@ const startRound = async () => {
             youtubeId: selectedVideo.videoId
         }
 
-        const result = await lobbyService.updateGameState({
+        // Update the used tracks list
+        const newUsedTracks = availableTracks.length > 0
+            ? [...usedTracks, selectedVideo.videoId]  // Add to existing list
+            : [selectedVideo.videoId]                 // Reset list with just this track
+
+        const result = await firebaseLobbyService.updateGameState({
             currentTrack: trackData,
             isRoundActive: true,
             roundStartTime: Date.now(),
-            roundEndTime: null
+            roundEndTime: null,
+            usedTracks: newUsedTracks
         })
 
         if (result.success) {
             // Refresh lobby data
             refreshLobbyData()
             showTrackInfo.value = false
+        } else {
+            console.error('Failed to start round:', result.error)
         }
     } catch (error) {
         console.error('Failed to start round:', error)
@@ -391,7 +446,7 @@ const submitGuess = async (guess: string, isSkip: boolean = false) => {
         // Check if the guess is correct (skipped guesses are always incorrect)
         const isCorrect = isSkip ? false : checkGuessCorrectness(guess, gameState.value?.currentTrack)
 
-        const result = await lobbyService.submitGuess(guess || '[SKIPPED]', isCorrect)
+        const result = await firebaseLobbyService.submitGuess(guess || '[SKIPPED]', isCorrect)
 
         if (result.success) {
             currentGuess.value = ''
@@ -406,6 +461,8 @@ const submitGuess = async (guess: string, isSkip: boolean = false) => {
                     showTrackInfo.value = true
                 }
             }
+        } else {
+            console.error('Failed to submit guess:', result.error)
         }
     } catch (error) {
         console.error('Failed to submit guess:', error)
@@ -434,7 +491,7 @@ const checkGuessCorrectness = (guess: string, track: { title: string; artist?: s
 }
 
 const skipAttempt = async () => {
-    await submitGuess('', true) // Empty guess with skip flag = skip
+    await submitGuess('', true) // Empty guess with isSkip = true
 }
 
 const nextRound = async () => {
@@ -460,7 +517,7 @@ const nextRound = async () => {
             }
         })
 
-        const result = await lobbyService.updateGameState({
+        const result = await firebaseLobbyService.updateGameState({
             currentRound: nextRoundNumber,
             currentTrack: null,
             isRoundActive: false,
@@ -472,6 +529,8 @@ const nextRound = async () => {
         if (result.success) {
             showTrackInfo.value = false
             refreshLobbyData()
+        } else {
+            console.error('Failed to start next round:', result.error)
         }
     } catch (error) {
         console.error('Failed to start next round:', error)
@@ -491,7 +550,7 @@ const endTournament = async () => {
         })
 
         // Update game state to mark tournament as complete
-        const result = await lobbyService.updateGameState({
+        const result = await firebaseLobbyService.updateGameState({
             isRoundActive: false,
             currentTrack: null,
             roundStartTime: 0,
@@ -501,16 +560,21 @@ const endTournament = async () => {
 
         if (result.success) {
             // Update lobby status to 'finished' to prevent polling issues
-            const finishResult = await lobbyService.finishTournament()
+            const finishResult = await firebaseLobbyService.finishTournament()
 
             if (finishResult.success) {
                 // Navigate to tournament results
-                router.push(`/lobby/${lobbyCode.value}/results`)
+                safeNavigate(`/lobby/${lobbyCode.value}/results`)
             } else {
                 console.error('Failed to finish tournament:', finishResult.error)
                 // Still navigate to results even if status update fails
-                router.push(`/lobby/${lobbyCode.value}/results`)
+                safeNavigate(`/lobby/${lobbyCode.value}/results`)
             }
+        } else {
+            console.error('Failed to update final game state:', result.error)
+            // Still try to finish tournament
+            await firebaseLobbyService.finishTournament()
+            safeNavigate(`/lobby/${lobbyCode.value}/results`)
         }
     } catch (error) {
         console.error('Failed to end tournament:', error)
@@ -519,54 +583,79 @@ const endTournament = async () => {
 
 // Data management
 const refreshLobbyData = () => {
-    const freshLobby = lobbyService.getLobby(lobbyCode.value)
-    if (freshLobby) {
-        lobbyData.value = freshLobby
+    // Get current lobby data from Firebase service
+    const currentLobby = firebaseLobbyService.getCurrentLobby()
+    if (currentLobby) {
+        lobbyData.value = currentLobby
     }
 }
 
-const pollGameUpdates = () => {
-    // Only poll if still in a multiplayer game route
-    if (!router.currentRoute.value.path.includes('/lobby/') || !router.currentRoute.value.path.includes('/game')) {
-        return
-    }
+// Set up real-time Firebase listeners
+const setupRealtimeListeners = () => {
+    // Listen to lobby changes (player updates, status changes)
+    firebaseLobbyService.listenToLobby(lobbyCode.value, (updatedLobby) => {
+        if (updatedLobby) {
+            lobbyData.value = updatedLobby
 
-    const previousGameState = gameState.value
-    const previousLobbyStatus = lobbyData.value?.status
-    refreshLobbyData()
+            // Check if game finished
+            if (updatedLobby.status === 'finished') {
+                safeNavigate(`/lobby/${lobbyCode.value}/results`)
+                return
+            }
+        } else {
+            // Lobby was deleted or connection lost
+            console.log('Lobby connection lost, redirecting to multiplayer menu')
+            safeNavigate('/multiplayer')
+        }
+    })
 
-    // Check if all players have finished and track info should be shown
-    if (!showTrackInfo.value && gameState.value?.currentTrack && areAllPlayersFinished()) {
-        console.log('All players have finished - showing track info')
+    // Listen to game state changes (round progression, player guesses, etc.)
+    firebaseLobbyService.listenToGameState(lobbyCode.value, (updatedGameState) => {
+        if (updatedGameState) {
+            // Capture previous track before updating
+            const previousTrack = gameState.value?.currentTrack
+
+            // Update local game state reference by updating the lobby data
+            if (lobbyData.value) {
+                lobbyData.value = {
+                    ...lobbyData.value,
+                    gameState: updatedGameState
+                }
+            }
+
+            // Handle UI state synchronization for all players
+            handleGameStateChanges(updatedGameState, previousTrack)
+        }
+    })
+}
+
+// Handle game state changes for UI synchronization
+const handleGameStateChanges = (newGameState: MultiplayerGameState, previousTrack?: { id: string; title: string; artist?: string; youtubeId: string } | null) => {
+    const currentTrack = newGameState.currentTrack
+
+    // If track info should be shown (all players finished or round ended)
+    const allFinished = areAllPlayersFinished()
+    const isRoundActiveAndStarted = newGameState.isRoundActive && newGameState.roundStartTime > 0
+
+    // Only show track info if the round is actually active and players have finished
+    if (!showTrackInfo.value && currentTrack && isRoundActiveAndStarted && allFinished) {
         showTrackInfo.value = true
     }
 
-    // Check if tournament has finished
-    if (lobbyData.value?.status === 'finished' && previousLobbyStatus !== 'finished') {
-        console.log('Tournament finished - navigating to results')
-        router.push(`/lobby/${lobbyCode.value}/results`)
-        return
+    // If a new round started (track changed from something to null)
+    if (previousTrack && !currentTrack) {
+        showTrackInfo.value = false
+        currentGuess.value = ''
+        isPlaying.value = false
+        isSubmittingGuess.value = false
     }
 
-    // Handle UI state synchronization for non-host players
-    if (!isHost.value && gameState.value) {
-        // If the current track changed from something to null (new round started)
-        if (previousGameState?.currentTrack && !gameState.value.currentTrack) {
-            console.log('New round detected - resetting UI state')
-            showTrackInfo.value = false
-            currentGuess.value = ''
-            isPlaying.value = false
-            isSubmittingGuess.value = false
-        }
-
-        // If a new track was set (round started)
-        if (!previousGameState?.currentTrack && gameState.value.currentTrack) {
-            console.log('Round started - resetting UI state for new track')
-            showTrackInfo.value = false
-            currentGuess.value = ''
-            isPlaying.value = false
-            isSubmittingGuess.value = false
-        }
+    // If a new track was set (round started)
+    if (!previousTrack && currentTrack) {
+        showTrackInfo.value = false
+        currentGuess.value = ''
+        isPlaying.value = false
+        isSubmittingGuess.value = false
     }
 }
 
@@ -577,49 +666,42 @@ onMounted(async () => {
 
     if (!lobbyData.value || lobbyData.value.status !== 'playing') {
         // Redirect back to lobby if game not active
-        router.push(`/lobby/${lobbyCode.value}`)
+        safeNavigate(`/lobby/${lobbyCode.value}`)
         return
     }
 
     // Load the playlist into audioStore for SmartGuessInput autocompletion
     await loadPlaylistForAutocompletion()
 
-    // Start polling for game updates
-    gamePollingInterval.value = setInterval(pollGameUpdates, 1000) // More frequent for game
+    // Set up real-time listeners for lobby and game state changes
+    setupRealtimeListeners()
 })
 
 // Load playlist into audioStore for autocompletion functionality
 const loadPlaylistForAutocompletion = async () => {
     const playlistUrl = gameSettings.value?.playlistUrl
     if (!playlistUrl) {
-        console.warn('No playlist URL available for autocompletion')
         return
     }
 
     try {
         // Use the existing method to load the custom playlist
         await audioStore.loadCustomPlaylistFromYouTube(playlistUrl)
-        console.log(`Loaded playlist for autocompletion with ${audioStore.playlist.length} tracks`)
-
     } catch (error) {
         console.warn('Failed to load playlist for autocompletion:', error)
     }
 }
 
 onUnmounted(() => {
-    if (gamePollingInterval.value) {
-        clearInterval(gamePollingInterval.value)
-        gamePollingInterval.value = null
-    }
+    // Clean up Firebase listeners
+    firebaseLobbyService.removeAllListeners()
 })
 
 // Also clean up when leaving route (ensures cleanup even if component doesn't unmount properly)
 onBeforeRouteLeave(() => {
-    if (gamePollingInterval.value) {
-        clearInterval(gamePollingInterval.value)
-        gamePollingInterval.value = null
-        console.log('Cleaned up game polling interval on route leave')
-    }
+    // Clean up Firebase listeners
+    firebaseLobbyService.removeAllListeners()
+    console.log('Cleaned up Firebase listeners on route leave')
 })
 </script>
 
