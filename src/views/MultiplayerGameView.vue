@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                        }}</span>
+                    }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -65,7 +65,7 @@
                     <div class="clip-info">
                         <div class="clip-duration">
                             <span class="duration-label">Current clip:</span>
-                            <span class="duration-value">{{ gameState.currentClipDuration }}s</span>
+                            <span class="duration-value">{{ getCurrentPlayerClipDuration() }}s</span>
                         </div>
                         <div class="attempts-display">
                             <div v-for="(duration, index) in gameState.clipDurations" :key="index" class="attempt-dot"
@@ -81,12 +81,17 @@
 
                     <div class="play-controls">
                         <button @click="playClip" :disabled="isPlaying" class="play-btn">
-                            {{ isPlaying ? '🔄 Playing...' : `▶️ Play ${gameState.currentClipDuration}s` }}
+                            {{ isPlaying ? '🔄 Playing...' : `▶️ Play ${getCurrentPlayerClipDuration()}s` }}
                         </button>
                         <button v-if="isPlaying" @click="stopClip" class="stop-btn">
                             ⏹️ Stop
                         </button>
                     </div>
+                </div>
+
+                <!-- Hidden YouTube Audio Player -->
+                <div class="hidden-audio-player">
+                    <YouTubeAudioPlayer />
                 </div>
 
                 <!-- Guess Section -->
@@ -142,9 +147,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { lobbyService, type LobbyData } from '@/services/lobbyService'
 import SmartGuessInput from '@/components/SmartGuessInput.vue'
+import YouTubeAudioPlayer from '@/components/YouTubeAudioPlayer.vue'
+import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
+import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
+import { getYouTubeApiKey } from '@/utils/env'
 
 const router = useRouter()
 const route = useRoute()
+const audioStore = useAudioPlayerStore()
 
 // Reactive state
 const lobbyData = ref<LobbyData | null>(null)
@@ -170,6 +180,12 @@ const getCurrentPlayerAttempts = () => {
     const currentPlayerId = lobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return 0
     return gameState.value.playerGuesses[currentPlayerId]?.attempts.length || 0
+}
+
+const getCurrentPlayerClipDuration = () => {
+    const attempts = getCurrentPlayerAttempts()
+    if (!gameState.value) return 1
+    return gameState.value.clipDurations[attempts] || gameState.value.clipDurations[gameState.value.clipDurations.length - 1] || 16
 }
 
 const hasCurrentPlayerWon = () => {
@@ -218,21 +234,48 @@ const startRound = async () => {
     isStartingRound.value = true
 
     try {
-        // TODO: Load a random track from the playlist
-        // For now, we'll use a mock track
-        const mockTrack = {
-            id: 'mock-' + Date.now(),
-            title: 'Test Song',
-            artist: 'Test Artist',
-            youtubeId: 'dQw4w9WgXcQ' // Rick Roll for testing
+        // Load tracks from the playlist
+        const playlistUrl = gameSettings.value?.playlistUrl
+        if (!playlistUrl) {
+            console.error('No playlist URL configured')
+            return
+        }
+
+        const playlistId = extractYouTubePlaylistId(playlistUrl)
+        if (!playlistId) {
+            console.error('Invalid playlist URL')
+            return
+        }
+
+        const apiKey = getYouTubeApiKey()
+        if (!apiKey) {
+            console.error('YouTube API key not configured')
+            return
+        }
+
+        // Fetch playlist videos
+        const playlistItems = await fetchPlaylistVideos(playlistId, apiKey)
+        if (playlistItems.length === 0) {
+            console.error('Playlist is empty or could not be loaded')
+            return
+        }
+
+        // Select a random track
+        const randomIndex = Math.floor(Math.random() * playlistItems.length)
+        const selectedVideo = playlistItems[randomIndex]
+
+        const trackData = {
+            id: selectedVideo.videoId,
+            title: selectedVideo.title,
+            artist: extractArtistFromTitle(selectedVideo.title),
+            youtubeId: selectedVideo.videoId
         }
 
         const result = await lobbyService.updateGameState({
-            currentTrack: mockTrack,
+            currentTrack: trackData,
             isRoundActive: true,
             roundStartTime: Date.now(),
-            roundEndTime: null,
-            currentClipDuration: gameState.value?.clipDurations[0] || 1
+            roundEndTime: null
         })
 
         if (result.success) {
@@ -247,17 +290,52 @@ const startRound = async () => {
     }
 }
 
+// Helper function to extract artist from video title
+const extractArtistFromTitle = (title: string): string => {
+    // Common patterns for artist extraction
+    const patterns = [
+        /^([^-]+)\s*-\s*(.+)$/,  // "Artist - Song"
+        /^(.+)\s*by\s*([^(]+)/i,  // "Song by Artist"
+        /^([^|]+)\s*\|\s*(.+)$/   // "Artist | Song"
+    ]
+
+    for (const pattern of patterns) {
+        const match = title.match(pattern)
+        if (match) {
+            return match[1].trim()
+        }
+    }
+
+    // If no pattern matches, return empty string
+    return ''
+}
+
 const playClip = async () => {
     if (!gameState.value?.currentTrack || isPlaying.value) return
+
+    const track = gameState.value.currentTrack
+    const clipDuration = getCurrentPlayerClipDuration()
 
     isPlaying.value = true
 
     try {
-        // TODO: Implement audio playback
-        // For now, just simulate playing
+        // Load the track in the audio player
+        await audioStore.loadTrack({
+            id: track.id,
+            videoId: track.youtubeId,
+            title: track.title,
+            artist: track.artist
+        })
+
+        // Play for the specified duration
+        audioStore.play()
+
+        // Stop after clip duration
         setTimeout(() => {
+            audioStore.pause()
             isPlaying.value = false
-        }, (gameState.value?.currentClipDuration || 1) * 1000)
+        }, clipDuration * 1000)
+
     } catch (error) {
         console.error('Failed to play clip:', error)
         isPlaying.value = false
@@ -265,22 +343,20 @@ const playClip = async () => {
 }
 
 const stopClip = () => {
+    audioStore.pause()
     isPlaying.value = false
-    // TODO: Stop actual audio playback
 }
 
-const submitGuess = async (guess: string) => {
-    if (!guess.trim() || isSubmittingGuess.value || hasCurrentPlayerWon()) return
+const submitGuess = async (guess: string, isSkip: boolean = false) => {
+    if ((!guess.trim() && !isSkip) || isSubmittingGuess.value || hasCurrentPlayerWon()) return
 
     isSubmittingGuess.value = true
 
     try {
-        // TODO: Implement proper guess checking logic
-        // For now, we'll use simple string matching
-        const isCorrect = gameState.value?.currentTrack &&
-            guess.toLowerCase().includes(gameState.value.currentTrack.title.toLowerCase())
+        // Check if the guess is correct (skipped guesses are always incorrect)
+        const isCorrect = isSkip ? false : checkGuessCorrectness(guess, gameState.value?.currentTrack)
 
-        const result = await lobbyService.submitGuess(guess, isCorrect || false)
+        const result = await lobbyService.submitGuess(guess || '[SKIPPED]', isCorrect)
 
         if (result.success) {
             currentGuess.value = ''
@@ -290,18 +366,11 @@ const submitGuess = async (guess: string) => {
             if (isCorrect) {
                 showTrackInfo.value = true
             } else {
-                // Update clip duration for next attempt
+                // Check if this player has reached maximum attempts
                 const currentAttempts = getCurrentPlayerAttempts()
-                if (currentAttempts < (gameState.value?.clipDurations.length || 6)) {
-                    const nextDuration = gameState.value?.clipDurations[currentAttempts] || 16
-                    if (isHost.value) {
-                        await lobbyService.updateGameState({
-                            currentClipDuration: nextDuration
-                        })
-                    }
-                } else {
-                    // Max attempts reached, reveal answer
-                    showTrackInfo.value = true
+                if (currentAttempts >= (gameState.value?.clipDurations.length || 6)) {
+                    // Max attempts reached for this player, but don't reveal answer yet
+                    // Other players might still be playing
                 }
             }
         }
@@ -312,8 +381,51 @@ const submitGuess = async (guess: string) => {
     }
 }
 
+// Helper function to check if a guess is correct
+const checkGuessCorrectness = (guess: string, track: { title: string; artist?: string } | null | undefined): boolean => {
+    if (!track || !guess.trim()) return false
+
+    const normalizeString = (str: string): string => {
+        return str.toLowerCase()
+            .replace(/[^\w\s]/g, '') // Remove punctuation
+            .replace(/\s+/g, ' ')    // Normalize whitespace
+            .trim()
+    }
+
+    const normalizedGuess = normalizeString(guess)
+    const normalizedTitle = normalizeString(track.title)
+    const normalizedArtist = track.artist ? normalizeString(track.artist) : ''
+
+    // Check for exact title match
+    if (normalizedTitle.includes(normalizedGuess) || normalizedGuess.includes(normalizedTitle)) {
+        return true
+    }
+
+    // Check for artist match if artist is available
+    if (normalizedArtist && (normalizedArtist.includes(normalizedGuess) || normalizedGuess.includes(normalizedArtist))) {
+        return true
+    }
+
+    // Check for partial word matches (at least 70% of words match)
+    const guessWords = normalizedGuess.split(' ').filter(word => word.length > 2)
+    const titleWords = normalizedTitle.split(' ').filter(word => word.length > 2)
+
+    if (guessWords.length > 0 && titleWords.length > 0) {
+        const matchingWords = guessWords.filter(guessWord =>
+            titleWords.some(titleWord =>
+                titleWord.includes(guessWord) || guessWord.includes(titleWord)
+            )
+        )
+
+        const matchRatio = matchingWords.length / Math.min(guessWords.length, titleWords.length)
+        return matchRatio >= 0.7
+    }
+
+    return false
+}
+
 const skipAttempt = async () => {
-    await submitGuess('') // Empty guess = skip
+    await submitGuess('', true) // Empty guess with skip flag = skip
 }
 
 const nextRound = async () => {
@@ -339,7 +451,6 @@ const nextRound = async () => {
             isRoundActive: false,
             roundStartTime: 0,
             roundEndTime: null,
-            currentClipDuration: gameState.value?.clipDurations[0] || 1,
             playerGuesses: updatedPlayerGuesses
         })
 
@@ -786,6 +897,15 @@ onUnmounted(() => {
 .waiting-host {
     color: #6c757d;
     font-style: italic;
+}
+
+.hidden-audio-player {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
 }
 
 @media (max-width: 768px) {

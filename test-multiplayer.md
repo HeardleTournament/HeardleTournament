@@ -15,19 +15,30 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
    - `updateGameSettings()` now gets fresh lobby data before updating settings
    - `updatePlayerReady()` now gets fresh lobby data before updating ready status
    - `startGame()` now gets fresh lobby data before starting the game
+   - `submitGuess()` now gets fresh lobby data before submitting guesses
+   - `updateGameState()` now gets fresh lobby data before updating game state
    - Added debug logging to track player counts during updates
 
 2. **Fixed game start propagation**: Added lobby status monitoring to both host and non-host polling functions to detect when the game starts and automatically navigate all players to the game view
 
-3. **Improved host polling**: The host now always updates the player list during polling instead of only when changes are detected
+3. **Implemented real multiplayer gameplay**:
 
-4. **Immediate polling**: Both host and non-host players now do an immediate poll when the lobby view mounts
+   - **Track Loading**: Host loads random tracks from the configured YouTube playlist using YouTube Data API
+   - **Audio Playback**: Integrated YouTube audio player for real track playback with precise timing
+   - **Smart Guess Checking**: Implemented intelligent guess matching with partial word matching and artist recognition
+   - **Real-time Updates**: Game state polling ensures all players see updates immediately
+   - **Scoring System**: Points calculated based on attempt number (fewer attempts = higher score)
+   - **Round Progression**: Host can progress through multiple rounds, players wait for host
 
-5. **Faster initial polling**: Reduced polling interval to 1 second for more responsive updates
+4. **Improved host polling**: The host now always updates the player list during polling instead of only when changes are detected
 
-6. **Timing fix**: Added small delay in onMounted to ensure localStorage operations complete
+5. **Immediate polling**: Both host and non-host players now do an immediate poll when the lobby view mounts
 
-7. **Selective updates**: Both host and non-host polling now update only specific parts of the lobby data (players or settings) instead of replacing the entire object, preventing player list resets
+6. **Faster initial polling**: Reduced polling interval to 1 second for more responsive updates
+
+7. **Timing fix**: Added small delay in onMounted to ensure localStorage operations complete
+
+8. **Selective updates**: Both host and non-host polling now update only specific parts of the lobby data (players or settings) instead of replacing the entire object, preventing player list resets
 
 ## Test Steps
 
@@ -76,6 +87,35 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 8. **Check**: Player1 and Player2 should automatically navigate to the game view as well
 9. **Check**: All players should see the multiplayer game interface
 
+### Test 6: Multiplayer Gameplay
+
+1. **Initial Game State**: All players should see "Get Ready!" screen
+2. **Host Controls**: Only the host should see the "Start Round 1" button
+3. **Start Round**: Host clicks "Start Round 1"
+4. **Track Loading**:
+   - A random track should be loaded from the configured playlist
+   - All players should see the clip controls and guess interface
+   - The track info should be hidden initially
+5. **Audio Playback**:
+   - Players can click "Play 1s" to hear a 1-second clip
+   - Audio should play for exactly 1 second then stop
+   - Players can stop playback early if needed
+6. **Guessing**:
+   - Players can type guesses and submit them
+   - Players can click "Skip" to move to the next clip length without guessing
+   - Each player has their own clip progression (1s, 2s, 4s, 7s, 11s, 16s)
+   - Incorrect guesses and skips only affect the individual player's clip length
+   - Correct guesses should reveal the track info and show "Won!" status
+7. **Scoring**:
+   - Players should see their attempt counts and scores update
+   - Correct guesses on earlier attempts should give higher scores
+8. **Round Progression**:
+   - After all attempts or a correct guess, the track should be revealed
+   - Host should see "Next Round" button
+   - Non-host players should see "Waiting for host..." message
+9. **Next Rounds**: Host can progress through all configured rounds
+10. **Tournament End**: After final round, host can end the tournament
+
 ## Expected Results
 
 - ✅ Players appear immediately when joining
@@ -85,6 +125,12 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 - ✅ Player count updates correctly
 - ✅ Game starts for all players when host clicks "Start Game"
 - ✅ All players navigate to the game view automatically
+- ✅ Host can start rounds with real tracks from the playlist
+- ✅ Audio playback works with actual YouTube tracks
+- ✅ Guess checking works with intelligent matching
+- ✅ Scoring system calculates points based on attempt number
+- ✅ Real-time updates work during gameplay
+- ✅ Round progression works for multiple rounds
 
 ## Previous Issues Fixed
 
@@ -93,3 +139,5 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 - Initial lobby load not getting latest data
 - Polling not starting immediately
 - Game start not propagating to other players (FIXED: Added lobby status monitoring in polling functions)
+- Skip button not working (FIXED: Modified submitGuess to accept skip parameter and handle empty guesses for skipping)
+- Individual clip progression (FIXED: Each player now has their own clip duration based on their attempts, skipping doesn't affect other players)

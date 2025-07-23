@@ -462,12 +462,18 @@ class LobbyService {
     guess: string,
     isCorrect: boolean,
   ): Promise<{ success: boolean; error?: string }> {
-    if (!this.currentLobby || !this.currentPlayerId || !this.currentLobby.gameState) {
-      return { success: false, error: 'No active game' }
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
     }
 
     try {
-      const gameState = this.currentLobby.gameState
+      // Get fresh lobby data from storage to ensure we have the latest game state
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby || !freshLobby.gameState) {
+        return { success: false, error: 'No active game' }
+      }
+
+      const gameState = freshLobby.gameState
       const playerState = gameState.playerGuesses[this.currentPlayerId]
 
       if (!playerState) {
@@ -491,7 +497,8 @@ class LobbyService {
         playerState.totalScore += playerState.roundScore
       }
 
-      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
       this.saveLobbiesStorage()
 
       return { success: true }
@@ -504,8 +511,8 @@ class LobbyService {
   async updateGameState(
     updates: Partial<MultiplayerGameState>,
   ): Promise<{ success: boolean; error?: string }> {
-    if (!this.currentLobby || !this.currentPlayerId || !this.currentLobby.gameState) {
-      return { success: false, error: 'No active game' }
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
     }
 
     if (this.currentLobby.hostId !== this.currentPlayerId) {
@@ -513,8 +520,15 @@ class LobbyService {
     }
 
     try {
-      Object.assign(this.currentLobby.gameState, updates)
-      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      // Get fresh lobby data from storage to ensure we have the latest game state
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby || !freshLobby.gameState) {
+        return { success: false, error: 'No active game' }
+      }
+
+      Object.assign(freshLobby.gameState, updates)
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
       this.saveLobbiesStorage()
       return { success: true }
     } catch {
