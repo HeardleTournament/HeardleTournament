@@ -124,7 +124,7 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { lobbyService, type LobbyData } from '@/services/lobbyService'
 import { getXenobladePlaylistUrl, getYouTubeApiKey } from '@/utils/env'
 import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
@@ -162,7 +162,7 @@ const lastKnownSettings = ref<string>('')
 const settingsJustUpdated = ref(false)
 
 // Polling interval for settings updates (for non-host players)
-let settingsPollingInterval: number | null = null
+const settingsPollingInterval = ref<number | null>(null)
 
 // Predefined playlists data
 const showPredefinedPlaylists = ref(false)
@@ -211,19 +211,19 @@ const canStartGame = computed(() => {
 watch(isHost, (newIsHost, oldIsHost) => {
   if (newIsHost && !oldIsHost) {
     // Became host - switch to host polling (less frequent, only for player updates)
-    if (settingsPollingInterval) {
-      clearInterval(settingsPollingInterval)
+    if (settingsPollingInterval.value) {
+      clearInterval(settingsPollingInterval.value)
     }
-    settingsPollingInterval = setInterval(() => {
+    settingsPollingInterval.value = setInterval(() => {
       pollLobbyUpdatesForHost()
     }, 3000) // Slower polling for host
     console.log('Became host - started host polling')
   } else if (!newIsHost && oldIsHost) {
     // No longer host - switch to regular polling
-    if (settingsPollingInterval) {
-      clearInterval(settingsPollingInterval)
+    if (settingsPollingInterval.value) {
+      clearInterval(settingsPollingInterval.value)
     }
-    settingsPollingInterval = setInterval(() => {
+    settingsPollingInterval.value = setInterval(() => {
       pollLobbyUpdates()
     }, 2000)
     console.log('No longer host - started regular polling')
@@ -374,7 +374,7 @@ onMounted(async () => {
         pollLobbyUpdatesForHost()
 
         // Host polls more frequently initially, then reduces frequency
-        settingsPollingInterval = setInterval(() => {
+        settingsPollingInterval.value = setInterval(() => {
           pollLobbyUpdatesForHost()
         }, 1000) // Start with faster polling
         console.log('Started host polling for player updates')
@@ -383,7 +383,7 @@ onMounted(async () => {
         pollLobbyUpdates()
 
         // Non-host players poll more frequently for settings and player updates
-        settingsPollingInterval = setInterval(() => {
+        settingsPollingInterval.value = setInterval(() => {
           pollLobbyUpdates()
         }, 1000) // Start with faster polling
         console.log('Started polling for non-host player')
@@ -403,13 +403,27 @@ onMounted(async () => {
 
 onUnmounted(() => {
   // Clean up polling interval
-  if (settingsPollingInterval) {
-    clearInterval(settingsPollingInterval)
-    settingsPollingInterval = null
+  if (settingsPollingInterval.value) {
+    clearInterval(settingsPollingInterval.value)
+    settingsPollingInterval.value = null
+  }
+})
+
+// Also clean up when leaving route (ensures cleanup even if component doesn't unmount properly)
+onBeforeRouteLeave(() => {
+  if (settingsPollingInterval.value) {
+    clearInterval(settingsPollingInterval.value)
+    settingsPollingInterval.value = null
+    console.log('Cleaned up polling interval on route leave')
   }
 })
 
 const leaveLobby = async () => {
+  // Clean up polling before leaving
+  if (settingsPollingInterval.value) {
+    clearInterval(settingsPollingInterval.value)
+    settingsPollingInterval.value = null
+  }
   await lobbyService.leaveLobby()
   router.push('/multiplayer')
 }
@@ -520,8 +534,8 @@ const startGame = async () => {
 
 // Poll for lobby updates (for non-host players only)
 const pollLobbyUpdates = () => {
-  // Only poll if we're not the host
-  if (isHost.value) {
+  // Only poll if we're not the host and still in a multiplayer route
+  if (isHost.value || !router.currentRoute.value.path.includes('/lobby/')) {
     return
   }
 
@@ -593,8 +607,8 @@ const pollLobbyUpdates = () => {
 
 // Poll for lobby updates (for host - only player changes, not settings)
 const pollLobbyUpdatesForHost = () => {
-  // Only poll if we are the host
-  if (!isHost.value) {
+  // Only poll if we are the host and still in a multiplayer route
+  if (!isHost.value || !router.currentRoute.value.path.includes('/lobby/')) {
     return
   }
 

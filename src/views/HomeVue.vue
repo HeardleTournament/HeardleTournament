@@ -28,10 +28,13 @@
 
 <script lang="ts" setup>
 import { useRouter } from 'vue-router'
+import { lobbyService } from '@/services/lobbyService'
 
 const router = useRouter()
 
 const goToSinglePlayer = () => {
+  // Clean up any multiplayer state when going to single player
+  lobbyService.leaveLobby()
   router.push('/config')
 }
 

@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                        }}</span>
+                    }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -158,7 +158,7 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { lobbyService, type LobbyData } from '@/services/lobbyService'
 import SmartGuessInput from '@/components/SmartGuessInput.vue'
 import YouTubeAudioPlayer from '@/components/YouTubeAudioPlayer.vue'
@@ -526,6 +526,11 @@ const refreshLobbyData = () => {
 }
 
 const pollGameUpdates = () => {
+    // Only poll if still in a multiplayer game route
+    if (!router.currentRoute.value.path.includes('/lobby/') || !router.currentRoute.value.path.includes('/game')) {
+        return
+    }
+
     const previousGameState = gameState.value
     const previousLobbyStatus = lobbyData.value?.status
     refreshLobbyData()
@@ -604,6 +609,16 @@ const loadPlaylistForAutocompletion = async () => {
 onUnmounted(() => {
     if (gamePollingInterval.value) {
         clearInterval(gamePollingInterval.value)
+        gamePollingInterval.value = null
+    }
+})
+
+// Also clean up when leaving route (ensures cleanup even if component doesn't unmount properly)
+onBeforeRouteLeave(() => {
+    if (gamePollingInterval.value) {
+        clearInterval(gamePollingInterval.value)
+        gamePollingInterval.value = null
+        console.log('Cleaned up game polling interval on route leave')
     }
 })
 </script>

@@ -54,4 +54,21 @@ const router = createRouter({
   ],
 })
 
+// Global navigation guard to clean up multiplayer state when leaving multiplayer routes
+router.beforeEach((to, from) => {
+  // Check if we're leaving multiplayer routes for non-multiplayer routes
+  const isLeavingMultiplayer =
+    (from.path.includes('/multiplayer') || from.path.includes('/lobby/')) &&
+    !to.path.includes('/multiplayer') &&
+    !to.path.includes('/lobby/')
+
+  if (isLeavingMultiplayer) {
+    // Import and clean up lobby service
+    import('@/services/lobbyService').then(({ lobbyService }) => {
+      console.log('Leaving multiplayer routes - cleaning up lobby state')
+      lobbyService.leaveLobby()
+    })
+  }
+})
+
 export default router
