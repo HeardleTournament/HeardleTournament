@@ -17,11 +17,17 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
    - `startGame()` now gets fresh lobby data before starting the game
    - Added debug logging to track player counts during updates
 
-2. **Improved host polling**: The host now always updates the player list during polling instead of only when changes are detected
-3. **Immediate polling**: Both host and non-host players now do an immediate poll when the lobby view mounts
-4. **Faster initial polling**: Reduced polling interval to 1 second for more responsive updates
-5. **Timing fix**: Added small delay in onMounted to ensure localStorage operations complete
-6. **Selective updates**: Both host and non-host polling now update only specific parts of the lobby data (players or settings) instead of replacing the entire object, preventing player list resets
+2. **Fixed game start propagation**: Added lobby status monitoring to both host and non-host polling functions to detect when the game starts and automatically navigate all players to the game view
+
+3. **Improved host polling**: The host now always updates the player list during polling instead of only when changes are detected
+
+4. **Immediate polling**: Both host and non-host players now do an immediate poll when the lobby view mounts
+
+5. **Faster initial polling**: Reduced polling interval to 1 second for more responsive updates
+
+6. **Timing fix**: Added small delay in onMounted to ensure localStorage operations complete
+
+7. **Selective updates**: Both host and non-host polling now update only specific parts of the lobby data (players or settings) instead of replacing the entire object, preventing player list resets
 
 ## Test Steps
 
@@ -58,6 +64,18 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 2. Repeat join process with name "Player2"
 3. **Check**: All three tabs should show all three players
 
+### Test 5: Game Start Functionality
+
+1. In the host tab (tab 1), ensure the "Start Game" button is disabled initially
+2. Have Player1 (tab 2) click "Ready Up"
+3. Have Player2 (tab 3) click "Ready Up"
+4. **Check**: Host should see both players as ready
+5. **Check**: The "Start Game" button should now be enabled for the host
+6. Host clicks "Start Game"
+7. **Check**: Host should navigate to the game view (`/lobby/[code]/game`)
+8. **Check**: Player1 and Player2 should automatically navigate to the game view as well
+9. **Check**: All players should see the multiplayer game interface
+
 ## Expected Results
 
 - ✅ Players appear immediately when joining
@@ -65,6 +83,8 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 - ✅ Players see themselves in the list
 - ✅ Ready status updates work correctly
 - ✅ Player count updates correctly
+- ✅ Game starts for all players when host clicks "Start Game"
+- ✅ All players navigate to the game view automatically
 
 ## Previous Issues Fixed
 
@@ -72,3 +92,4 @@ The issue was in the **lobbyService** methods (`updateGameSettings`, `updatePlay
 - Host polling only updating on detected changes
 - Initial lobby load not getting latest data
 - Polling not starting immediately
+- Game start not propagating to other players (FIXED: Added lobby status monitoring in polling functions)

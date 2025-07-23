@@ -530,6 +530,13 @@ const pollLobbyUpdates = () => {
   if (freshLobbyData) {
     const previousLobbyData = lobbyData.value
 
+    // Check if the game has started (status changed to 'playing')
+    if (freshLobbyData.status === 'playing' && (!previousLobbyData || previousLobbyData.status !== 'playing')) {
+      console.log('Game started by host - navigating to game view')
+      router.push(`/lobby/${lobbyCode.value}/game`)
+      return
+    }
+
     // Update lobby data selectively to avoid resetting player list
     if (lobbyData.value) {
       // Only update if there are actual changes to avoid unnecessary re-renders
@@ -587,6 +594,13 @@ const pollLobbyUpdatesForHost = () => {
   const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
   if (freshLobbyData) {
     const previousLobbyData = lobbyData.value
+
+    // Check if the game has started (status changed to 'playing') - this could happen if another host instance started the game
+    if (freshLobbyData.status === 'playing' && (!previousLobbyData || previousLobbyData.status !== 'playing')) {
+      console.log('Game started - navigating to game view')
+      router.push(`/lobby/${lobbyCode.value}/game`)
+      return
+    }
 
     // Always update the players data for the host to ensure they see new players immediately
     // This handles the case where players join while the host is already in the lobby
