@@ -216,6 +216,18 @@ class LobbyService {
     return this.currentLobby
   }
 
+  // Refresh current lobby data from storage (for real-time updates)
+  refreshCurrentLobby(): LobbyData | null {
+    if (this.currentLobby) {
+      const freshData = this.getLobby(this.currentLobby.id)
+      if (freshData) {
+        this.currentLobby = freshData
+      }
+      return freshData
+    }
+    return null
+  }
+
   getCurrentPlayerId(): string | null {
     return this.currentPlayerId
   }
@@ -280,6 +292,8 @@ class LobbyService {
       this.currentLobby.gameSettings = updatedSettings
       this.lobbies.set(this.currentLobby.id, this.currentLobby)
       this.saveLobbiesStorage()
+
+      console.log('Host updated game settings:', updatedSettings)
 
       return { success: true }
     } catch {

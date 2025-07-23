@@ -24,11 +24,16 @@
 
       <div class="lobby-info">
         <h3>Game Settings</h3>
-        <div v-if="!isHost" class="settings-info">
-          <p><strong>Tournament:</strong> {{ gameSettings?.tournamentName || 'Multiplayer Game' }}</p>
-          <p><strong>Rounds:</strong> {{ gameSettings?.totalRounds || 5 }}</p>
-          <p><strong>Playlist:</strong> {{ getPlaylistLabel(gameSettings?.playlistUrl || '') }}</p>
-          <p><strong>Status:</strong> Waiting for players</p>
+        <div v-if="!isHost" class="settings-info" :class="{ 'settings-updated': settingsJustUpdated }">
+          <div class="settings-header">
+            <p><strong>Tournament:</strong> {{ gameSettings?.tournamentName || 'Multiplayer Game' }}</p>
+            <p><strong>Rounds:</strong> {{ gameSettings?.totalRounds || 5 }}</p>
+            <p><strong>Playlist:</strong> {{ getPlaylistLabel(gameSettings?.playlistUrl || '') }}</p>
+            <p><strong>Status:</strong> Waiting for players</p>
+          </div>
+          <div class="player-notice">
+            <small>⚡ Settings update automatically when the host makes changes</small>
+          </div>
         </div>
         <div v-else class="settings-form">
           <!-- Tournament Name -->
@@ -118,7 +123,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { lobbyService, type LobbyData } from '@/services/lobbyService'
 import { getXenobladePlaylistUrl, getYouTubeApiKey } from '@/utils/env'
@@ -152,6 +157,13 @@ const showPredefined = ref(false)
 const maxSongs = ref<number>(0)
 const isLoadingPlaylist = ref(false)
 
+// Settings synchronization state
+const lastKnownSettings = ref<string>('')
+const settingsJustUpdated = ref(false)
+
+// Polling interval for settings updates (for non-host players)
+let settingsPollingInterval: number | null = null
+
 // Predefined playlists data
 const showPredefinedPlaylists = ref(false)
 const predefinedPlaylists = ref<PredefinedPlaylist[]>([
@@ -173,6 +185,47 @@ const isHost = computed(() => {
   const currentPlayerId = lobbyService.getCurrentPlayerId()
   return lobbyData.value?.hostId === currentPlayerId
 })
+
+// Watch for host status changes to start/stop polling
+watch(isHost, (newIsHost, oldIsHost) => {
+  if (newIsHost && !oldIsHost) {
+    // Became host - stop polling
+    if (settingsPollingInterval) {
+      clearInterval(settingsPollingInterval)
+      settingsPollingInterval = null
+      console.log('Became host - stopped polling')
+    }
+  } else if (!newIsHost && oldIsHost) {
+    // No longer host - start polling
+    if (!settingsPollingInterval) {
+      settingsPollingInterval = setInterval(() => {
+        pollLobbyUpdates()
+      }, 2000)
+      console.log('No longer host - started polling')
+    }
+  }
+})
+
+// Watch for game settings changes (for non-host players to see updates)
+watch(gameSettings, (newSettings) => {
+  if (newSettings) {
+    const settingsJson = JSON.stringify(newSettings)
+    if (settingsJson !== lastKnownSettings.value) {
+      lastKnownSettings.value = settingsJson
+
+      // If we're not the host, update our display
+      if (!isHost.value) {
+        console.log('Settings updated by host:', newSettings)
+
+        // Trigger visual feedback for settings update
+        settingsJustUpdated.value = true
+        setTimeout(() => {
+          settingsJustUpdated.value = false
+        }, 2000)
+      }
+    }
+  }
+}, { deep: true, immediate: true })
 
 // Initialize editable settings when lobby data changes
 watch(gameSettings, (newSettings) => {
@@ -281,10 +334,23 @@ const updateMaxSongs = async (url: string) => {
 }
 
 onMounted(() => {
-  // Get current lobby data
-  const currentLobby = lobbyService.getCurrentLobby()
-  if (currentLobby && currentLobby.id === lobbyCode.value) {
+  // Get fresh lobby data from storage
+  const currentLobby = lobbyService.getLobby(lobbyCode.value)
+  if (currentLobby) {
     lobbyData.value = currentLobby
+
+    // Set up polling for lobby updates (every 2 seconds) - only for non-host players
+    // Use nextTick to ensure computed properties are updated
+    nextTick(() => {
+      if (!isHost.value) {
+        settingsPollingInterval = setInterval(() => {
+          pollLobbyUpdates()
+        }, 2000)
+        console.log('Started polling for non-host player')
+      } else {
+        console.log('Host detected - no polling needed')
+      }
+    })
   } else {
     // Redirect if no valid lobby data
     router.push('/multiplayer')
@@ -298,7 +364,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // Clean up any listeners when leaving
+  // Clean up polling interval
+  if (settingsPollingInterval) {
+    clearInterval(settingsPollingInterval)
+    settingsPollingInterval = null
+  }
 })
 
 const leaveLobby = async () => {
@@ -342,15 +412,55 @@ const updateSettings = async () => {
       })
 
       if (result.success) {
-        // Update local lobby data
-        lobbyData.value = lobbyService.getCurrentLobby()
+        // Update local lobby data with fresh data from storage
+        lobbyData.value = lobbyService.refreshCurrentLobby()
         showSettingsMessage('Settings updated successfully!', 'success')
+
+        // Trigger a manual refresh for all players by updating localStorage timestamp
+        localStorage.setItem('lobby-settings-updated', Date.now().toString())
+
+        console.log('Host updated settings - fresh lobby data:', lobbyData.value?.gameSettings)
       } else {
         showSettingsMessage(result.error || 'Failed to update settings', 'error')
       }
     }
   } catch {
     showSettingsMessage('Error updating settings', 'error')
+  }
+}
+
+// Poll for lobby updates (for non-host players only)
+const pollLobbyUpdates = () => {
+  // Only poll if we're not the host
+  if (isHost.value) {
+    return
+  }
+
+  // Use getLobby to get fresh data from localStorage instead of cached data
+  const freshLobbyData = lobbyService.getLobby(lobbyCode.value)
+  if (freshLobbyData) {
+    const previousLobbyData = lobbyData.value
+    lobbyData.value = freshLobbyData
+
+    // Check if settings have changed
+    if (previousLobbyData) {
+      const prevSettings = previousLobbyData.gameSettings
+      const newSettings = freshLobbyData.gameSettings
+
+      if (JSON.stringify(prevSettings) !== JSON.stringify(newSettings)) {
+        console.log('Host updated game settings:', newSettings)
+
+        // Trigger visual feedback for settings update
+        settingsJustUpdated.value = true
+        setTimeout(() => {
+          settingsJustUpdated.value = false
+        }, 2000)
+      }
+    }
+  } else {
+    // Lobby no longer exists - redirect to multiplayer menu
+    console.log('Lobby no longer exists, redirecting...')
+    router.push('/multiplayer')
   }
 }
 </script>
@@ -468,6 +578,52 @@ const updateSettings = async () => {
 .settings-info p {
   margin: 0 0 10px 0;
   color: #2c3e50;
+}
+
+.settings-header {
+  margin-bottom: 15px;
+}
+
+.player-notice {
+  background: rgba(0, 123, 255, 0.1);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.player-notice small {
+  color: #007bff;
+  font-weight: 500;
+}
+
+.settings-updated {
+  animation: settingsHighlight 2s ease-in-out;
+}
+
+@keyframes settingsHighlight {
+  0% {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+  }
+
+  25% {
+    background: rgba(0, 123, 255, 0.1);
+    box-shadow: 0 15px 35px rgba(0, 123, 255, 0.2);
+    transform: scale(1.02);
+  }
+
+  75% {
+    background: rgba(0, 123, 255, 0.05);
+    box-shadow: 0 15px 35px rgba(0, 123, 255, 0.1);
+    transform: scale(1.01);
+  }
+
+  100% {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    transform: scale(1);
+  }
 }
 
 .settings-form {
