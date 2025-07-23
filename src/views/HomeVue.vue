@@ -14,11 +14,11 @@
           </div>
         </button>
 
-        <button class="menu-button multiplayer-btn" @click="goToMultiplayer" disabled>
+        <button class="menu-button multiplayer-btn" @click="goToMultiplayer">
           <div class="button-icon">👥</div>
           <div class="button-text">
             <h3>Multiplayer</h3>
-            <p>Coming soon - Play with friends!</p>
+            <p>Play with friends online!</p>
           </div>
         </button>
       </div>
@@ -36,8 +36,7 @@ const goToSinglePlayer = () => {
 }
 
 const goToMultiplayer = () => {
-  // For now, do nothing - multiplayer coming soon
-  console.log('Multiplayer mode coming soon!')
+  router.push('/multiplayer')
 }
 </script>
 
