@@ -19,7 +19,9 @@ export function hasYouTubeApiKey(): boolean {
 }
 
 export function getXenobladePlaylistUrl(): string {
-  return import.meta.env.VITE_XENO_PLAYLIST
+  const url = import.meta.env.VITE_XENO_PLAYLIST
+  console.log('Xenoblade playlist URL from env:', url)
+  return url
 }
 
 /**
