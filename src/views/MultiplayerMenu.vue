@@ -183,7 +183,7 @@ const handleCreateLobby = async () => {
             showStatus(result.error || 'Failed to create lobby', 'error')
         }
     } catch (error) {
-        showStatus('Network error. Please check your connection. ', 'error')
+        showStatus(`Network error: ${error instanceof Error ? error.message : 'Please check your connection.'}`, 'error')
     } finally {
         isCreatingLobby.value = false
         playerName.value = ''
@@ -208,7 +208,7 @@ const handleJoinLobby = async () => {
             showStatus(result.error || 'Failed to join lobby', 'error')
         }
     } catch (error) {
-        showStatus('Network error. Please check your connection.', 'error')
+        showStatus(`Network error: ${error instanceof Error ? error.message : 'Please check your connection.'}`, 'error')
     } finally {
         isJoiningLobby.value = false
         playerName.value = ''

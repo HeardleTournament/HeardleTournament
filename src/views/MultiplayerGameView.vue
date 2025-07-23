@@ -208,12 +208,6 @@ const hasCurrentPlayerWon = () => {
     return gameState.value.playerGuesses[currentPlayerId]?.hasWon || false
 }
 
-const hasCurrentPlayerLost = () => {
-    const currentPlayerId = lobbyService.getCurrentPlayerId()
-    if (!currentPlayerId || !gameState.value) return false
-    return gameState.value.playerGuesses[currentPlayerId]?.hasLost || false
-}
-
 const hasCurrentPlayerFinishedRound = () => {
     const currentPlayerId = lobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return false
