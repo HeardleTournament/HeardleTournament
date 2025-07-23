@@ -537,6 +537,14 @@ const pollLobbyUpdates = () => {
       return
     }
 
+    // Check if the tournament has finished (status changed to 'finished')
+    // Only redirect if this is a real-time status change, not when manually navigating back to lobby
+    if (freshLobbyData.status === 'finished' && previousLobbyData && previousLobbyData.status !== 'finished') {
+      console.log('Tournament finished - navigating to results view')
+      router.push(`/lobby/${lobbyCode.value}/results`)
+      return
+    }
+
     // Update lobby data selectively to avoid resetting player list
     if (lobbyData.value) {
       // Only update if there are actual changes to avoid unnecessary re-renders
@@ -599,6 +607,14 @@ const pollLobbyUpdatesForHost = () => {
     if (freshLobbyData.status === 'playing' && (!previousLobbyData || previousLobbyData.status !== 'playing')) {
       console.log('Game started - navigating to game view')
       router.push(`/lobby/${lobbyCode.value}/game`)
+      return
+    }
+
+    // Check if the tournament has finished (status changed to 'finished')
+    // Only redirect if this is a real-time status change, not when manually navigating back to lobby
+    if (freshLobbyData.status === 'finished' && previousLobbyData && previousLobbyData.status !== 'finished') {
+      console.log('Tournament finished - navigating to results view')
+      router.push(`/lobby/${lobbyCode.value}/results`)
       return
     }
 

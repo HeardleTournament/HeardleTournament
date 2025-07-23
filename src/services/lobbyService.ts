@@ -535,6 +535,71 @@ class LobbyService {
       return { success: false, error: 'Failed to update game state' }
     }
   }
+
+  // Finish tournament (host only) - changes lobby status to 'finished'
+  async finishTournament(): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
+    }
+
+    if (this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can finish tournament' }
+    }
+
+    try {
+      // Get fresh lobby data from storage
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby) {
+        return { success: false, error: 'Lobby not found' }
+      }
+
+      // Update lobby status to finished
+      freshLobby.status = 'finished'
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
+      this.saveLobbiesStorage()
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to finish tournament' }
+    }
+  }
+
+  // Reset lobby to waiting status (host only) - allows starting a new tournament
+  async resetLobby(): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
+    }
+
+    if (this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can reset lobby' }
+    }
+
+    try {
+      // Get fresh lobby data from storage
+      const freshLobby = this.getLobby(this.currentLobby.id)
+      if (!freshLobby) {
+        return { success: false, error: 'Lobby not found' }
+      }
+
+      // Reset lobby status and clear game state
+      freshLobby.status = 'waiting'
+      freshLobby.gameState = undefined
+
+      // Reset all players' ready status
+      Object.keys(freshLobby.players).forEach((playerId) => {
+        if (!freshLobby.players[playerId].isHost) {
+          freshLobby.players[playerId].isReady = false
+        }
+      })
+
+      this.currentLobby = freshLobby
+      this.lobbies.set(freshLobby.id, freshLobby)
+      this.saveLobbiesStorage()
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to reset lobby' }
+    }
+  }
 }
 
 export const lobbyService = new LobbyService()

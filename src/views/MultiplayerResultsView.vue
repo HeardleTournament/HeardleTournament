@@ -98,8 +98,26 @@ const getMedal = (position: number): string => {
 }
 
 // Actions
-const backToLobby = () => {
-    router.push(`/lobby/${lobbyCode.value}`)
+const backToLobby = async () => {
+    // If the current user is the host, reset the lobby to allow a new tournament
+    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    const isCurrentUserHost = lobbyData.value?.hostId === currentPlayerId
+
+    if (isCurrentUserHost) {
+        console.log('Host is resetting lobby for new tournament')
+        const resetResult = await lobbyService.resetLobby()
+        if (resetResult.success) {
+            console.log('Lobby reset successful, navigating to lobby')
+            router.push(`/lobby/${lobbyCode.value}`)
+        } else {
+            console.error('Failed to reset lobby:', resetResult.error)
+            // Navigate anyway, let the lobby handle it
+            router.push(`/lobby/${lobbyCode.value}`)
+        }
+    } else {
+        // Non-host players just navigate back
+        router.push(`/lobby/${lobbyCode.value}`)
+    }
 }
 
 const backToMenu = () => {
@@ -111,6 +129,19 @@ onMounted(() => {
     const freshLobby = lobbyService.getLobby(lobbyCode.value)
     if (freshLobby) {
         lobbyData.value = freshLobby
+
+        // Check if tournament is actually finished
+        if (freshLobby.status !== 'finished') {
+            console.log('Tournament not finished, redirecting based on status:', freshLobby.status)
+            if (freshLobby.status === 'playing') {
+                // Game is still active, redirect to game view
+                router.push(`/lobby/${lobbyCode.value}/game`)
+            } else {
+                // Game hasn't started, redirect to lobby
+                router.push(`/lobby/${lobbyCode.value}`)
+            }
+            return
+        }
     } else {
         // Redirect to multiplayer menu if lobby not found
         router.push('/multiplayer')

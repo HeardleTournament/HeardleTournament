@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                        }}</span>
+                    }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -467,13 +467,26 @@ const endTournament = async () => {
     if (!isHost.value) return
 
     try {
+        // Update game state to mark tournament as complete
         const result = await lobbyService.updateGameState({
-            isRoundActive: false
+            isRoundActive: false,
+            currentTrack: null,
+            roundStartTime: 0,
+            roundEndTime: null
         })
 
         if (result.success) {
-            // Navigate to tournament results
-            router.push(`/lobby/${lobbyCode.value}/results`)
+            // Update lobby status to 'finished' to prevent polling issues
+            const finishResult = await lobbyService.finishTournament()
+
+            if (finishResult.success) {
+                // Navigate to tournament results
+                router.push(`/lobby/${lobbyCode.value}/results`)
+            } else {
+                console.error('Failed to finish tournament:', finishResult.error)
+                // Still navigate to results even if status update fails
+                router.push(`/lobby/${lobbyCode.value}/results`)
+            }
         }
     } catch (error) {
         console.error('Failed to end tournament:', error)
@@ -490,7 +503,15 @@ const refreshLobbyData = () => {
 
 const pollGameUpdates = () => {
     const previousGameState = gameState.value
+    const previousLobbyStatus = lobbyData.value?.status
     refreshLobbyData()
+
+    // Check if tournament has finished
+    if (lobbyData.value?.status === 'finished' && previousLobbyStatus !== 'finished') {
+        console.log('Tournament finished - navigating to results')
+        router.push(`/lobby/${lobbyCode.value}/results`)
+        return
+    }
 
     // Handle UI state synchronization for non-host players
     if (!isHost.value && gameState.value) {
