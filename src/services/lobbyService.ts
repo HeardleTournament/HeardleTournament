@@ -55,14 +55,20 @@ class LobbyService {
       if (stored) {
         const lobbiesData = JSON.parse(stored)
         this.lobbies = new Map(Object.entries(lobbiesData))
+        console.log('Loaded lobbies from storage:', Array.from(this.lobbies.keys()))
         // Clean up old lobbies (older than 1 hour)
         const oneHourAgo = Date.now() - 60 * 60 * 1000
+        let cleanedCount = 0
         for (const [code, lobby] of this.lobbies.entries()) {
           if (lobby.createdAt < oneHourAgo) {
             this.lobbies.delete(code)
+            cleanedCount++
           }
         }
-        this.saveLobbiesStorage()
+        if (cleanedCount > 0) {
+          console.log(`Cleaned up ${cleanedCount} old lobbies`)
+          this.saveLobbiesStorage()
+        }
       }
     } catch {
       console.warn('Could not load lobbies from storage')
@@ -73,9 +79,15 @@ class LobbyService {
     try {
       const lobbiesObj = Object.fromEntries(this.lobbies.entries())
       localStorage.setItem('heardle_lobbies', JSON.stringify(lobbiesObj))
+      console.log('Saved lobbies to storage:', Array.from(this.lobbies.keys()))
     } catch {
       console.warn('Could not save lobbies to storage')
     }
+  }
+
+  // Force reload lobbies from storage (for joining lobbies created in other sessions)
+  private reloadLobbiesFromStorage(): void {
+    this.loadLobbiesFromStorage()
   }
 
   async createLobby(
@@ -133,11 +145,19 @@ class LobbyService {
       // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 800))
 
+      // Reload lobbies from storage to get the latest data (in case lobby was created in another session)
+      this.reloadLobbiesFromStorage()
+      console.log('Attempting to join lobby:', lobbyCode)
+      console.log('Available lobbies:', Array.from(this.lobbies.keys()))
+
       // Check if the lobby exists
       const lobby = this.lobbies.get(lobbyCode)
       if (!lobby) {
+        console.log('Lobby not found in available lobbies')
         return { success: false, error: 'Lobby not found' }
       }
+
+      console.log('Found lobby:', lobby)
 
       if (lobby.status !== 'waiting') {
         return { success: false, error: 'Game already in progress' }
@@ -161,6 +181,7 @@ class LobbyService {
       this.saveLobbiesStorage()
       this.currentLobby = lobby
 
+      console.log('Successfully joined lobby')
       return { success: true, lobby }
     } catch {
       return { success: false, error: 'Failed to join lobby' }
@@ -201,7 +222,26 @@ class LobbyService {
 
   // Get lobby by code (for joining)
   getLobby(lobbyCode: string): LobbyData | null {
+    // Reload from storage to get latest data
+    this.reloadLobbiesFromStorage()
     return this.lobbies.get(lobbyCode) || null
+  }
+
+  // Get all available lobbies (for debugging)
+  getAllLobbies(): LobbyData[] {
+    this.reloadLobbiesFromStorage()
+    return Array.from(this.lobbies.values())
+  }
+
+  // Debug method to check what lobbies exist
+  debugLobbies(): void {
+    this.reloadLobbiesFromStorage()
+    console.log('Current lobbies in storage:')
+    for (const [code, lobby] of this.lobbies.entries()) {
+      console.log(
+        `- ${code}: ${lobby.hostName}'s lobby (${Object.keys(lobby.players).length} players)`,
+      )
+    }
   }
 
   // Update lobby data (for real-time updates simulation)
@@ -211,6 +251,56 @@ class LobbyService {
     if (this.currentLobby?.id === lobbyData.id) {
       this.currentLobby = lobbyData
     }
+  }
+
+  // Update game settings (host only)
+  async updateGameSettings(settings: {
+    totalRounds?: number
+    tournamentName?: string
+    playlistUrl?: string
+  }): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby' }
+    }
+
+    // Check if current player is host
+    if (this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can change settings' }
+    }
+
+    try {
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      const updatedSettings = {
+        ...this.currentLobby.gameSettings,
+        ...settings,
+      }
+
+      this.currentLobby.gameSettings = updatedSettings
+      this.lobbies.set(this.currentLobby.id, this.currentLobby)
+      this.saveLobbiesStorage()
+
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Failed to update settings' }
+    }
+  }
+
+  // Get available playlist options for dropdown
+  getPlaylistOptions(): Array<{ value: string; label: string }> {
+    return [
+      { value: '', label: 'Default Playlist' },
+      { value: 'pop-hits', label: 'Pop Hits' },
+      { value: 'rock-classics', label: 'Rock Classics' },
+      { value: '80s-90s', label: '80s & 90s' },
+      { value: 'indie-alternative', label: 'Indie & Alternative' },
+      { value: 'hip-hop-rap', label: 'Hip-Hop & Rap' },
+      { value: 'electronic-dance', label: 'Electronic & Dance' },
+      { value: 'country', label: 'Country' },
+      { value: 'r-b-soul', label: 'R&B & Soul' },
+      { value: 'custom', label: 'Custom Playlist URL' },
+    ]
   }
 
   // Clean up old lobbies (called periodically)
