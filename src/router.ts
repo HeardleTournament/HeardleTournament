@@ -4,6 +4,7 @@ import GameView from './views/GameView.vue'
 import ConfigView from './views/ConfigView.vue'
 import TournamentResults from './views/TournamentResults.vue'
 import MultiplayerMenu from './views/MultiplayerMenu.vue'
+import LobbyView from './views/LobbyView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,6 +33,11 @@ const router = createRouter({
       path: '/multiplayer',
       name: 'multiplayer',
       component: MultiplayerMenu,
+    },
+    {
+      path: '/lobby/:lobbyCode',
+      name: 'lobby',
+      component: LobbyView,
     },
   ],
 })
