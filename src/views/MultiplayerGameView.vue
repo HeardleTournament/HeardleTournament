@@ -31,6 +31,7 @@
                             <span class="attempts">{{ getPlayerAttempts(player.id) }}/{{ gameState.maxAttempts }}</span>
                             <span class="score">{{ getPlayerScore(player.id) }} pts</span>
                             <span v-if="hasPlayerWon(player.id)" class="won">🎉 Won!</span>
+                            <span v-else-if="hasPlayerLost(player.id)" class="completed">✅ Complete</span>
                         </div>
                     </div>
                 </div>
@@ -71,8 +72,9 @@
                             <div v-for="(duration, index) in gameState.clipDurations" :key="index" class="attempt-dot"
                                 :class="{
                                     'completed': index < getCurrentPlayerAttempts(),
-                                    'current': index === getCurrentPlayerAttempts() && !hasCurrentPlayerWon(),
-                                    'correct': index < getCurrentPlayerAttempts() && isCurrentPlayerAttemptCorrect(index)
+                                    'current': index === getCurrentPlayerAttempts() && !hasCurrentPlayerWon() && !hasCurrentPlayerFinishedRound(),
+                                    'correct': index < getCurrentPlayerAttempts() && isCurrentPlayerAttemptCorrect(index),
+                                    'finished': hasCurrentPlayerFinishedRound() && index === getCurrentPlayerAttempts() - 1
                                 }">
                                 {{ duration }}s
                             </div>
@@ -95,15 +97,27 @@
                 </div>
 
                 <!-- Guess Section -->
-                <div v-if="!hasCurrentPlayerWon() && !showTrackInfo" class="guess-section">
+                <div v-if="!hasCurrentPlayerWon() && !hasCurrentPlayerFinishedRound() && !showTrackInfo"
+                    class="guess-section">
                     <SmartGuessInput v-model="currentGuess" @submit="submitGuess"
-                        :disabled="isSubmittingGuess || hasCurrentPlayerWon()" placeholder="Type your guess..."
-                        submit-text="Submit Guess" />
+                        :disabled="isSubmittingGuess || hasCurrentPlayerWon() || hasCurrentPlayerFinishedRound()"
+                        placeholder="Type song title or artist..." submit-text="Submit Guess" />
 
                     <div class="guess-actions">
-                        <button @click="skipAttempt" :disabled="isSubmittingGuess" class="skip-btn">
+                        <button @click="skipAttempt" :disabled="isSubmittingGuess || hasCurrentPlayerFinishedRound()"
+                            class="skip-btn">
                             Skip (+{{ getNextClipDuration() }}s)
                         </button>
+                    </div>
+                </div>
+
+                <!-- Player Round Completed Message -->
+                <div v-if="hasCurrentPlayerFinishedRound() && !hasCurrentPlayerWon() && !showTrackInfo"
+                    class="round-completed-section">
+                    <div class="completed-message">
+                        <h3>🎵 Round Completed</h3>
+                        <p>You used all {{ gameState.maxAttempts }} attempts. Better luck next round!</p>
+                        <p>Wait for other players to finish or for the host to reveal the answer.</p>
                     </div>
                 </div>
 
@@ -194,6 +208,18 @@ const hasCurrentPlayerWon = () => {
     return gameState.value.playerGuesses[currentPlayerId]?.hasWon || false
 }
 
+const hasCurrentPlayerLost = () => {
+    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    if (!currentPlayerId || !gameState.value) return false
+    return gameState.value.playerGuesses[currentPlayerId]?.hasLost || false
+}
+
+const hasCurrentPlayerFinishedRound = () => {
+    const currentPlayerId = lobbyService.getCurrentPlayerId()
+    if (!currentPlayerId || !gameState.value) return false
+    return gameState.value.playerGuesses[currentPlayerId]?.hasLost || false
+}
+
 const isCurrentPlayerAttemptCorrect = (attemptIndex: number) => {
     const currentPlayerId = lobbyService.getCurrentPlayerId()
     if (!currentPlayerId || !gameState.value) return false
@@ -211,6 +237,11 @@ const hasPlayerWon = (playerId: string) => {
     return gameState.value.playerGuesses[playerId]?.hasWon || false
 }
 
+const hasPlayerLost = (playerId: string) => {
+    if (!gameState.value) return false
+    return gameState.value.playerGuesses[playerId]?.hasLost || false
+}
+
 const getPlayerScore = (playerId: string) => {
     if (!gameState.value) return 0
     return gameState.value.playerGuesses[playerId]?.totalScore || 0
@@ -219,6 +250,16 @@ const getPlayerScore = (playerId: string) => {
 const getPlayerRoundScore = (playerId: string) => {
     if (!gameState.value) return 0
     return gameState.value.playerGuesses[playerId]?.roundScore || 0
+}
+
+const areAllPlayersFinished = () => {
+    if (!gameState.value) return false
+
+    // Check if all players have either won or lost
+    return Object.keys(gameState.value.playerGuesses).every(playerId => {
+        const playerState = gameState.value!.playerGuesses[playerId]
+        return playerState.hasWon || playerState.hasLost
+    })
 }
 
 const getNextClipDuration = () => {
@@ -366,11 +407,9 @@ const submitGuess = async (guess: string, isSkip: boolean = false) => {
             if (isCorrect) {
                 showTrackInfo.value = true
             } else {
-                // Check if this player has reached maximum attempts
-                const currentAttempts = getCurrentPlayerAttempts()
-                if (currentAttempts >= (gameState.value?.clipDurations.length || 6)) {
-                    // Max attempts reached for this player, but don't reveal answer yet
-                    // Other players might still be playing
+                // Check if all players have finished (won or lost)
+                if (areAllPlayersFinished()) {
+                    showTrackInfo.value = true
                 }
             }
         }
@@ -385,43 +424,19 @@ const submitGuess = async (guess: string, isSkip: boolean = false) => {
 const checkGuessCorrectness = (guess: string, track: { title: string; artist?: string } | null | undefined): boolean => {
     if (!track || !guess.trim()) return false
 
-    const normalizeString = (str: string): string => {
-        return str.toLowerCase()
-            .replace(/[^\w\s]/g, '') // Remove punctuation
-            .replace(/\s+/g, ' ')    // Normalize whitespace
-            .trim()
-    }
+    const normalizedGuess = guess.toLowerCase().trim()
+    const normalizedTitle = track.title.toLowerCase().trim()
+    const normalizedArtist = track.artist?.toLowerCase().trim() || ''
 
-    const normalizedGuess = normalizeString(guess)
-    const normalizedTitle = normalizeString(track.title)
-    const normalizedArtist = track.artist ? normalizeString(track.artist) : ''
+    // Use the same validation logic as the solo game for consistency
+    // Check if guess matches title or artist (exact match or contains, but must be substantial)
+    const isCorrect =
+        normalizedGuess === normalizedTitle ||
+        normalizedGuess === normalizedArtist ||
+        (normalizedTitle.includes(normalizedGuess) && normalizedGuess.length > 3) ||
+        (normalizedArtist.includes(normalizedGuess) && normalizedGuess.length > 3)
 
-    // Check for exact title match
-    if (normalizedTitle.includes(normalizedGuess) || normalizedGuess.includes(normalizedTitle)) {
-        return true
-    }
-
-    // Check for artist match if artist is available
-    if (normalizedArtist && (normalizedArtist.includes(normalizedGuess) || normalizedGuess.includes(normalizedArtist))) {
-        return true
-    }
-
-    // Check for partial word matches (at least 70% of words match)
-    const guessWords = normalizedGuess.split(' ').filter(word => word.length > 2)
-    const titleWords = normalizedTitle.split(' ').filter(word => word.length > 2)
-
-    if (guessWords.length > 0 && titleWords.length > 0) {
-        const matchingWords = guessWords.filter(guessWord =>
-            titleWords.some(titleWord =>
-                titleWord.includes(guessWord) || guessWord.includes(titleWord)
-            )
-        )
-
-        const matchRatio = matchingWords.length / Math.min(guessWords.length, titleWords.length)
-        return matchRatio >= 0.7
-    }
-
-    return false
+    return isCorrect
 }
 
 const skipAttempt = async () => {
@@ -441,6 +456,7 @@ const nextRound = async () => {
                 ...updatedPlayerGuesses[playerId],
                 attempts: [],
                 hasWon: false,
+                hasLost: false,
                 roundScore: 0
             }
         })
@@ -506,6 +522,12 @@ const pollGameUpdates = () => {
     const previousLobbyStatus = lobbyData.value?.status
     refreshLobbyData()
 
+    // Check if all players have finished and track info should be shown
+    if (!showTrackInfo.value && gameState.value?.currentTrack && areAllPlayersFinished()) {
+        console.log('All players have finished - showing track info')
+        showTrackInfo.value = true
+    }
+
     // Check if tournament has finished
     if (lobbyData.value?.status === 'finished' && previousLobbyStatus !== 'finished') {
         console.log('Tournament finished - navigating to results')
@@ -536,7 +558,7 @@ const pollGameUpdates = () => {
 }
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
     // Get initial lobby data
     refreshLobbyData()
 
@@ -546,9 +568,30 @@ onMounted(() => {
         return
     }
 
+    // Load the playlist into audioStore for SmartGuessInput autocompletion
+    await loadPlaylistForAutocompletion()
+
     // Start polling for game updates
     gamePollingInterval.value = setInterval(pollGameUpdates, 1000) // More frequent for game
 })
+
+// Load playlist into audioStore for autocompletion functionality
+const loadPlaylistForAutocompletion = async () => {
+    const playlistUrl = gameSettings.value?.playlistUrl
+    if (!playlistUrl) {
+        console.warn('No playlist URL available for autocompletion')
+        return
+    }
+
+    try {
+        // Use the existing method to load the custom playlist
+        await audioStore.loadCustomPlaylistFromYouTube(playlistUrl)
+        console.log(`Loaded playlist for autocompletion with ${audioStore.playlist.length} tracks`)
+
+    } catch (error) {
+        console.warn('Failed to load playlist for autocompletion:', error)
+    }
+}
 
 onUnmounted(() => {
     if (gamePollingInterval.value) {
@@ -674,6 +717,15 @@ onUnmounted(() => {
 
 .won {
     font-size: 0.8rem;
+    color: #28a745;
+    font-weight: 600;
+}
+
+.lost,
+.completed {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 600;
 }
 
 .waiting-for-round,
@@ -797,6 +849,17 @@ onUnmounted(() => {
     color: white;
 }
 
+.attempt-dot.lost {
+    background: #dc3545;
+    color: white;
+}
+
+.attempt-dot.finished {
+    background: #6c757d;
+    color: white;
+    opacity: 0.8;
+}
+
 .play-controls {
     display: flex;
     justify-content: center;
@@ -837,6 +900,34 @@ onUnmounted(() => {
 
 .guess-section {
     margin-bottom: 30px;
+}
+
+.player-lost-section,
+.round-completed-section {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.lost-message,
+.completed-message {
+    background: rgba(108, 117, 125, 0.1);
+    border: 2px solid rgba(108, 117, 125, 0.3);
+    border-radius: 15px;
+    padding: 20px;
+    color: #495057;
+}
+
+.lost-message h3,
+.completed-message h3 {
+    color: #6c757d;
+    margin: 0 0 10px 0;
+    font-size: 1.5rem;
+}
+
+.lost-message p,
+.completed-message p {
+    margin: 5px 0;
+    font-size: 1rem;
 }
 
 .guess-actions {

@@ -21,6 +21,7 @@ interface MultiplayerGameState {
     [playerId: string]: {
       attempts: { guess: string; isCorrect: boolean; timestamp: number }[]
       hasWon: boolean
+      hasLost: boolean
       roundScore: number
       totalScore: number
     }
@@ -414,6 +415,7 @@ class LobbyService {
         gameState.playerGuesses[playerId] = {
           attempts: [],
           hasWon: false,
+          hasLost: false,
           roundScore: 0,
           totalScore: 0,
         }
@@ -495,6 +497,12 @@ class LobbyService {
         const multiplier = Math.max(1, 7 - attemptNumber) // Higher score for fewer attempts
         playerState.roundScore = baseScore * multiplier
         playerState.totalScore += playerState.roundScore
+      } else {
+        // Check if player has reached maximum attempts and should lose
+        if (playerState.attempts.length >= gameState.maxAttempts) {
+          playerState.hasLost = true
+          playerState.roundScore = 0 // No points for losing
+        }
       }
 
       this.currentLobby = freshLobby
