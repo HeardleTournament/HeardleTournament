@@ -13,7 +13,7 @@
                 <h1>🏆 {{ gameSettings?.tournamentName || 'Multiplayer Tournament' }}</h1>
                 <div class="round-info">
                     <span class="round-counter">Round {{ gameState.currentRound }} of {{ gameSettings?.totalRounds || 5
-                    }}</span>
+                        }}</span>
                     <span class="lobby-code">Lobby: {{ lobbyCode }}</span>
                 </div>
             </div>
@@ -489,7 +489,29 @@ const refreshLobbyData = () => {
 }
 
 const pollGameUpdates = () => {
+    const previousGameState = gameState.value
     refreshLobbyData()
+
+    // Handle UI state synchronization for non-host players
+    if (!isHost.value && gameState.value) {
+        // If the current track changed from something to null (new round started)
+        if (previousGameState?.currentTrack && !gameState.value.currentTrack) {
+            console.log('New round detected - resetting UI state')
+            showTrackInfo.value = false
+            currentGuess.value = ''
+            isPlaying.value = false
+            isSubmittingGuess.value = false
+        }
+
+        // If a new track was set (round started)
+        if (!previousGameState?.currentTrack && gameState.value.currentTrack) {
+            console.log('Round started - resetting UI state for new track')
+            showTrackInfo.value = false
+            currentGuess.value = ''
+            isPlaying.value = false
+            isSubmittingGuess.value = false
+        }
+    }
 }
 
 // Lifecycle
