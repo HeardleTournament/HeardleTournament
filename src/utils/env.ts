@@ -7,7 +7,23 @@
  * @returns YouTube API key or null if not set
  */
 export function getYouTubeApiKey(): string | null {
-  return import.meta.env.VITE_YOUTUBE_API_KEY || null
+  const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || null
+  
+  // Debug logging for troubleshooting
+  if (apiKey) {
+    console.log('YouTube API Key Debug:', {
+      length: apiKey.length,
+      firstChar: apiKey.charAt(0),
+      lastChar: apiKey.charAt(apiKey.length - 1),
+      startsWithAI: apiKey.startsWith('AI'),
+      hasExtraChars: apiKey.includes('+') || apiKey.includes(' '),
+      buildTime: new Date().toISOString()
+    })
+  } else {
+    console.log('YouTube API Key is null or undefined')
+  }
+  
+  return apiKey
 }
 
 /**
