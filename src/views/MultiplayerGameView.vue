@@ -164,7 +164,7 @@ import SmartGuessInput from '@/components/SmartGuessInput.vue'
 import YouTubeAudioPlayer from '@/components/YouTubeAudioPlayer.vue'
 import { useAudioPlayerStore } from '@/stores/audioPlayerStore'
 import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
-import { getYouTubeApiKey } from '@/utils/env'
+import { getYouTubeApiKey, getXenobladePlaylistUrl } from '@/utils/env'
 
 const router = useRouter()
 const route = useRoute()
@@ -310,9 +310,16 @@ const startRound = async () => {
 
     try {
         // Load tracks from the playlist
-        const playlistUrl = gameSettings.value?.playlistUrl
+        let playlistUrl = gameSettings.value?.playlistUrl
+
+        // Fallback to Xenoblade playlist if no playlist URL is configured in lobby
         if (!playlistUrl) {
-            console.error('No playlist URL configured')
+            playlistUrl = getXenobladePlaylistUrl()
+            console.log('No playlist URL in lobby settings, using fallback:', playlistUrl)
+        }
+
+        if (!playlistUrl) {
+            console.error('No playlist URL configured and no fallback available')
             return
         }
 
@@ -679,7 +686,14 @@ onMounted(async () => {
 
 // Load playlist into audioStore for autocompletion functionality
 const loadPlaylistForAutocompletion = async () => {
-    const playlistUrl = gameSettings.value?.playlistUrl
+    let playlistUrl = gameSettings.value?.playlistUrl
+
+    // Fallback to Xenoblade playlist if no playlist URL is configured in lobby
+    if (!playlistUrl) {
+        playlistUrl = getXenobladePlaylistUrl()
+        console.log('Using fallback playlist for autocompletion:', playlistUrl)
+    }
+
     if (!playlistUrl) {
         return
     }

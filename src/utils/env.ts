@@ -8,7 +8,7 @@
  */
 export function getYouTubeApiKey(): string | null {
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || null
-  
+
   // Debug logging for troubleshooting
   if (apiKey) {
     console.log('YouTube API Key Debug:', {
@@ -22,7 +22,7 @@ export function getYouTubeApiKey(): string | null {
   } else {
     console.log('YouTube API Key is null or undefined')
   }
-  
+
   return apiKey
 }
 
@@ -35,7 +35,17 @@ export function hasYouTubeApiKey(): boolean {
 }
 
 export function getXenobladePlaylistUrl(): string {
-  return import.meta.env.VITE_XENO_PLAYLIST
+  const playlistUrl = import.meta.env.VITE_XENO_PLAYLIST
+
+  // Debug logging for troubleshooting
+  console.log('Xenoblade Playlist URL Debug:', {
+    url: playlistUrl || 'undefined/empty',
+    length: playlistUrl ? playlistUrl.length : 0,
+    isString: typeof playlistUrl === 'string',
+    buildTime: new Date().toISOString()
+  })
+
+  return playlistUrl
 }
 
 /**
