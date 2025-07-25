@@ -793,13 +793,9 @@ const startGame = async () => {
 }
 
 .predefined-toggle::after {
-  content: '▼';
+  content: '';
   font-size: 0.8rem;
   transition: transform 0.3s ease;
-}
-
-.predefined-toggle.open::after {
-  transform: rotate(180deg);
 }
 
 .predefined-menu {
@@ -826,7 +822,7 @@ const startGame = async () => {
 
 .predefined-btn {
   width: 100%;
-  padding: 12px 16px;
+  padding: 0;
   background: transparent;
   border: none;
   text-align: left;
@@ -834,10 +830,7 @@ const startGame = async () => {
   transition: all 0.3s ease;
   color: #2c3e50;
   font-size: 0.95rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  display: block;
 }
 
 .predefined-btn:hover {
@@ -851,19 +844,42 @@ const startGame = async () => {
   font-weight: 600;
 }
 
-.predefined-btn .playlist-name {
+.playlist-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.playlist-info h4 {
+  margin: 0;
+  font-size: 1rem;
   font-weight: 600;
   color: inherit;
+  line-height: 1.3;
 }
 
-.predefined-btn .song-count {
-  font-size: 0.8rem;
+.playlist-info p {
+  margin: 0;
+  font-size: 0.85rem;
   color: #6c757d;
-  font-weight: normal;
+  line-height: 1.3;
 }
 
-.predefined-btn.selected .song-count {
+.predefined-btn.selected .playlist-info p {
   color: #667eea;
+}
+
+.playlist-meta {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.predefined-btn.selected .playlist-meta {
+  color: #667eea;
+  opacity: 1;
 }
 
 @media (max-width: 768px) {
