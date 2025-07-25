@@ -153,6 +153,43 @@
                 </div>
             </div>
         </div>
+
+        <!-- Next Round Confirmation Modal -->
+        <div v-if="showNextRoundConfirmation" class="modal-overlay" @click="cancelNextRound">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h3>⚠️ Players Still Playing</h3>
+                    <button @click="cancelNextRound" class="modal-close">×</button>
+                </div>
+
+                <div class="modal-body">
+                    <p>Some players haven't finished their current round yet:</p>
+
+                    <div class="players-still-playing">
+                        <div v-for="player in playersStillPlaying" :key="player.id" class="player-item">
+                            <span class="player-name">{{ player.name }}</span>
+                            <span v-if="player.isHost" class="host-badge">Host</span>
+                            <span class="player-status">{{ getPlayerAttempts(player.id) }}/{{ gameState?.maxAttempts }} attempts</span>
+                        </div>
+                    </div>
+
+                    <p class="confirmation-text">
+                        Proceeding will end the current round for all players and reveal the answer.
+                        Players who haven't finished will receive 0 points for this round.
+                    </p>
+                    <p class="confirmation-text">Are you sure you want to continue?</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button @click="cancelNextRound" class="modal-btn cancel">
+                        Cancel
+                    </button>
+                    <button @click="proceedToNextRound" class="modal-btn confirm">
+                        Yes, Next Round
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -192,6 +229,7 @@ const isPlaying = ref(false)
 const isSubmittingGuess = ref(false)
 const isStartingRound = ref(false)
 const showTrackInfo = ref(false)
+const showNextRoundConfirmation = ref(false)
 
 // Computed properties
 const lobbyCode = computed(() => route.params.lobbyCode as string)
@@ -202,6 +240,7 @@ const isHost = computed(() => {
     const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
     return lobbyData.value?.hostId === currentPlayerId
 })
+const playersStillPlaying = computed(() => getPlayersStillPlaying())
 
 // Game state helpers
 const getCurrentPlayerAttempts = () => {
@@ -294,6 +333,26 @@ const areAllPlayersFinished = () => {
     })
 
     return result
+}
+
+const getPlayersStillPlaying = () => {
+    if (!gameState.value || !lobbyData.value) return []
+
+    const allPlayerIds = Object.keys(lobbyData.value.players)
+
+    return allPlayerIds.filter(playerId => {
+        const playerState = gameState.value!.playerGuesses[playerId]
+        // If player doesn't have game state yet, they're still playing
+        if (!playerState) return true
+
+        // If player hasn't won or lost, they're still playing
+        if (!playerState.hasWon && !playerState.hasLost) return true
+
+        // If player has no attempts yet, they're still playing
+        if (playerState.attempts.length === 0 && !playerState.hasLost) return true
+
+        return false
+    }).map(playerId => lobbyData.value!.players[playerId])
 }
 
 const getNextClipDuration = () => {
@@ -504,6 +563,19 @@ const skipAttempt = async () => {
 const nextRound = async () => {
     if (!isHost.value) return
 
+    // Check if players are still playing and show confirmation if needed
+    if (!areAllPlayersFinished()) {
+        showNextRoundConfirmation.value = true
+        return
+    }
+
+    // If all players finished, proceed directly
+    await proceedToNextRound()
+}
+
+const proceedToNextRound = async () => {
+    if (!isHost.value) return
+
     try {
         const nextRoundNumber = (gameState.value?.currentRound || 1) + 1
 
@@ -535,6 +607,7 @@ const nextRound = async () => {
 
         if (result.success) {
             showTrackInfo.value = false
+            showNextRoundConfirmation.value = false
             refreshLobbyData()
         } else {
             console.error('Failed to start next round:', result.error)
@@ -542,6 +615,10 @@ const nextRound = async () => {
     } catch (error) {
         console.error('Failed to start next round:', error)
     }
+}
+
+const cancelNextRound = () => {
+    showNextRoundConfirmation.value = false
 }
 
 const endTournament = async () => {
@@ -585,6 +662,13 @@ const endTournament = async () => {
         }
     } catch (error) {
         console.error('Failed to end tournament:', error)
+    }
+}
+
+// Handle keyboard events for modal
+const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && showNextRoundConfirmation.value) {
+        cancelNextRound()
     }
 }
 
@@ -668,6 +752,9 @@ const handleGameStateChanges = (newGameState: MultiplayerGameState, previousTrac
 
 // Lifecycle
 onMounted(async () => {
+    // Add keyboard event listener for modal
+    document.addEventListener('keydown', handleKeydown)
+
     // Get initial lobby data
     refreshLobbyData()
 
@@ -707,6 +794,9 @@ const loadPlaylistForAutocompletion = async () => {
 }
 
 onUnmounted(() => {
+    // Clean up keyboard event listener
+    document.removeEventListener('keydown', handleKeydown)
+
     // Clean up Firebase listeners
     firebaseLobbyService.removeAllListeners()
 })
@@ -1195,5 +1285,174 @@ onBeforeRouteLeave(() => {
         text-align: center;
         gap: 8px;
     }
+}
+
+/* Next Round Confirmation Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #721c24;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #721c24;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.modal-close:hover {
+    background: rgba(114, 28, 36, 0.1);
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.modal-body p {
+    margin: 0 0 20px 0;
+    color: #495057;
+    line-height: 1.5;
+}
+
+.confirmation-text {
+    font-weight: 500;
+    color: #dc3545;
+    margin-top: 20px !important;
+}
+
+.players-still-playing {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 15px;
+    margin: 15px 0;
+    border-left: 4px solid #ffc107;
+}
+
+.player-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.player-item:last-child {
+    border-bottom: none;
+}
+
+.player-item .player-name {
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.player-item .host-badge {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.player-item .player-status {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.modal-actions {
+    padding: 20px 25px;
+    background: #f8f9fa;
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}
+
+.modal-btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.modal-btn.cancel {
+    background: #6c757d;
+    color: white;
+}
+
+.modal-btn.cancel:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.modal-btn.confirm {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+}
+
+.modal-btn.confirm:hover {
+    background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
 </style>

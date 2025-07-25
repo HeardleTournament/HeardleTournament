@@ -420,7 +420,6 @@ export const useHeardleStore = defineStore('heardle', () => {
     usedTrackIds.value.add(randomTrack.id)
 
     currentRound.value++
-    console.log('Starting round:', currentRound.value, 'with track:', randomTrack.title)
     await startNewGame(randomTrack)
   }
 
