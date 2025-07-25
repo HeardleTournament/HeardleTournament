@@ -366,8 +366,6 @@ const backToMenu = () => {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  max-height: 500px;
-  overflow-y: auto;
 }
 
 .round-item {
@@ -391,7 +389,7 @@ const backToMenu = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
+  padding: 12px 20px;
   background: #f8f9fa;
   border-bottom: 1px solid #e0e6ed;
 }
@@ -416,12 +414,12 @@ const backToMenu = () => {
 }
 
 .round-details {
-  padding: 20px;
+  padding: 15px 20px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 20px;
-  min-height: 60px;
+  min-height: 50px;
 }
 
 .track-info {
@@ -582,6 +580,12 @@ const backToMenu = () => {
   .round-stats {
     justify-content: space-around;
     width: 100%;
+    gap: 15px;
+  }
+
+  .round-stat {
+    flex: 1;
+    min-width: 0;
   }
 
   .results-actions {
