@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_YOUTUBE_API_KEY: string
-  readonly VITE_XENO_PLAYLIST: string
+  readonly VITE_XENO_PLAYLIST?: string // Optional - fallback to config
   readonly VITE_FIREBASE_API_KEY: string
   readonly VITE_FIREBASE_AUTH_DOMAIN: string
   readonly VITE_FIREBASE_DATABASE_URL: string

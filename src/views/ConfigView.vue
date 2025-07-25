@@ -91,18 +91,12 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getXenobladePlaylistUrl } from '@/utils/env'
+import { DEFAULT_PLAYLISTS, type PlaylistConfig } from '@/config/playlists'
 
 const router = useRouter()
 
-// Interface for predefined playlists
-interface PredefinedPlaylist {
-  id: string
-  name: string
-  description: string
-  url: string
-  songCount: string
-  genre: string
-}
+// Interface for predefined playlists (using the same interface as the config)
+type PredefinedPlaylist = PlaylistConfig
 
 // Form data
 const playerName = ref('')
@@ -114,28 +108,15 @@ const maxSongs = ref<number>(0)
 // Predefined playlists state
 const showPredefined = ref(false)
 
-// Predefined playlists data
-const predefinedPlaylists = ref<PredefinedPlaylist[]>([
-  {
-    id: 'xenoblade',
-    name: 'Xenoblade Chronicles',
-    description: 'Epic orchestral soundtrack from the Xenoblade Chronicles series',
-    url: getXenobladePlaylistUrl(),
-    songCount: '50+',
-    genre: 'Video Game OST'
-  }
-])
+// Predefined playlists data - now using the centralized configuration
+const predefinedPlaylists = ref<PredefinedPlaylist[]>(DEFAULT_PLAYLISTS)
 
 const selectPredefinedPlaylist = (playlist: PredefinedPlaylist) => {
   playlistUrl.value = playlist.url
   showPredefined.value = false
 
-  // Set estimated max songs based on the playlist
-  if (playlist.id === 'xenoblade') {
-    maxSongs.value = 50 // Estimated for Xenoblade playlist
-  } else {
-    maxSongs.value = 25 // Default estimate for other playlists
-  }
+  // Set estimated max songs based on the playlist configuration
+  maxSongs.value = playlist.estimatedSongs || 25
 
   // Reset song count to a reasonable default if it exceeds max
   if (songCount.value > maxSongs.value) {

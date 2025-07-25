@@ -128,16 +128,10 @@ import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { firebaseLobbyService, type LobbyData } from '@/services/firebaseLobbyService'
 import { getXenobladePlaylistUrl, getYouTubeApiKey } from '@/utils/env'
 import { extractYouTubePlaylistId, fetchPlaylistVideos } from '@/utils/youtube'
+import { DEFAULT_PLAYLISTS, type PlaylistConfig, getPlaylistLabel as getPlaylistLabelFromConfig, getPlaylistConfigByUrl } from '@/config/playlists'
 
-// Interface for predefined playlists
-interface PredefinedPlaylist {
-  id: string
-  name: string
-  description: string
-  url: string
-  songCount: string
-  genre: string
-}
+// Interface for predefined playlists (using the same interface as the config)
+type PredefinedPlaylist = PlaylistConfig
 
 const router = useRouter()
 const route = useRoute()
@@ -161,18 +155,9 @@ const isLoadingPlaylist = ref(false)
 const lastKnownSettings = ref<string>('')
 const settingsJustUpdated = ref(false)
 
-// Predefined playlists data
+// Predefined playlists data - now using the centralized configuration
 const showPredefinedPlaylists = ref(false)
-const predefinedPlaylists = ref<PredefinedPlaylist[]>([
-  {
-    id: 'xenoblade',
-    name: 'Xenoblade Chronicles',
-    description: 'Epic orchestral soundtrack from the Xenoblade Chronicles series',
-    url: getXenobladePlaylistUrl(),
-    songCount: 'Loading...', // Will be updated dynamically
-    genre: 'RPG/Orchestral'
-  }
-])
+const predefinedPlaylists = ref<PredefinedPlaylist[]>(DEFAULT_PLAYLISTS)
 const lobbyCode = computed(() => route.params.lobbyCode as string)
 const players = computed(() => lobbyData.value ? Object.values(lobbyData.value.players) : [])
 const playerCount = computed(() => players.value.length)
@@ -312,10 +297,10 @@ const updateMaxSongs = async (url: string) => {
   } catch (error) {
     console.warn('Error fetching playlist data:', error)
 
-    // Fallback to estimates if API fails
-    const xenobladeUrl = getXenobladePlaylistUrl()
-    if (url === xenobladeUrl) {
-      maxSongs.value = 99 // Known estimate for Xenoblade playlist
+    // Fallback to estimates from configuration if API fails
+    const playlistConfig = getPlaylistConfigByUrl(url)
+    if (playlistConfig && playlistConfig.estimatedSongs) {
+      maxSongs.value = playlistConfig.estimatedSongs
     } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
       maxSongs.value = 25 // Conservative estimate for unknown YouTube playlists
     } else {
@@ -389,16 +374,8 @@ const leaveLobby = async () => {
   router.push('/multiplayer')
 }
 
-const getPlaylistLabel = (playlistUrl: string): string => {
-  const xenobladeUrl = getXenobladePlaylistUrl()
-  if (playlistUrl === xenobladeUrl) {
-    return 'Xenoblade Chronicles'
-  }
-  if (playlistUrl && playlistUrl.startsWith('http')) {
-    return 'Custom Playlist'
-  }
-  return 'Default Playlist'
-}
+// Use the centralized playlist label function
+const getPlaylistLabel = getPlaylistLabelFromConfig
 
 const showSettingsMessage = (message: string, type: 'success' | 'error' = 'success') => {
   settingsUpdateMessage.value = message

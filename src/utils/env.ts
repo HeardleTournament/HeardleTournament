@@ -35,17 +35,23 @@ export function hasYouTubeApiKey(): boolean {
 }
 
 export function getXenobladePlaylistUrl(): string {
-  const playlistUrl = import.meta.env.VITE_XENO_PLAYLIST
+  // For backward compatibility, first check if environment variable is set
+  const envPlaylistUrl = import.meta.env.VITE_XENO_PLAYLIST
 
-  // Debug logging for troubleshooting
-  console.log('Xenoblade Playlist URL Debug:', {
-    url: playlistUrl || 'undefined/empty',
-    length: playlistUrl ? playlistUrl.length : 0,
-    isString: typeof playlistUrl === 'string',
-    buildTime: new Date().toISOString()
-  })
+  if (envPlaylistUrl) {
+    // Debug logging for troubleshooting
+    console.log('Xenoblade Playlist URL Debug (from env):', {
+      url: envPlaylistUrl || 'undefined/empty',
+      length: envPlaylistUrl ? envPlaylistUrl.length : 0,
+      isString: typeof envPlaylistUrl === 'string',
+      buildTime: new Date().toISOString()
+    })
+    return envPlaylistUrl
+  }
 
-  return playlistUrl
+  // Fallback to default configuration
+  console.log('Using default Xenoblade playlist from config')
+  return 'https://www.youtube.com/playlist?list=PLvNp0Boas721OFweCH2OdAbgaaziNHV7S'
 }
 
 /**

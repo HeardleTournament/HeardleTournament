@@ -120,16 +120,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { firebaseLobbyService, type LobbyData } from '@/services/firebaseLobbyService'
 import { getXenobladePlaylistUrl } from '@/utils/env'
+import { DEFAULT_PLAYLISTS, type PlaylistConfig, getPlaylistLabel as getPlaylistLabelFromConfig } from '@/config/playlists'
 
-// Interface for predefined playlists
-interface PredefinedPlaylist {
-    id: string
-    name: string
-    description: string
-    url: string
-    songCount: string
-    genre: string
-}
+// Interface for predefined playlists (using the same interface as the config)
+type PredefinedPlaylist = PlaylistConfig
 
 const router = useRouter()
 const route = useRoute()
@@ -146,18 +140,9 @@ const editableSettings = ref({
 const settingsUpdateMessage = ref('')
 const settingsUpdateType = ref<'success' | 'error'>('success')
 
-// Predefined playlists state
+// Predefined playlists state - now using the centralized configuration
 const showPredefined = ref(false)
-const predefinedPlaylists = ref<PredefinedPlaylist[]>([
-    {
-        id: 'xenoblade',
-        name: 'Xenoblade Chronicles',
-        description: 'Epic orchestral soundtrack from the Xenoblade Chronicles series',
-        url: getXenobladePlaylistUrl(),
-        songCount: '99+ songs',
-        genre: 'RPG/Orchestral'
-    }
-])
+const predefinedPlaylists = ref<PredefinedPlaylist[]>(DEFAULT_PLAYLISTS)
 
 // Computed properties
 const lobbyCode = computed(() => route.params.lobbyCode as string)
@@ -276,16 +261,8 @@ const leaveLobby = async () => {
     }
 }
 
-const getPlaylistLabel = (playlistUrl: string): string => {
-    const xenobladeUrl = getXenobladePlaylistUrl()
-    if (playlistUrl === xenobladeUrl) {
-        return 'Xenoblade Chronicles'
-    }
-    if (playlistUrl && playlistUrl.startsWith('http')) {
-        return 'Custom Playlist'
-    }
-    return 'Default Playlist'
-}
+// Use the centralized playlist label function
+const getPlaylistLabel = getPlaylistLabelFromConfig
 
 const reconnect = () => {
     connectionError.value = ''
