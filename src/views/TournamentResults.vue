@@ -118,16 +118,20 @@
         </button>
       </div>
 
-      <!-- Debug info (only shows in development) -->
-      <div v-if="debugWinInfo" style="background: #f0f0f0; padding: 10px; margin: 10px; border-radius: 5px; color: black;">
+      <!-- Debug info (always visible for debugging) -->
+      <div style="background: #f0f0f0; padding: 10px; margin: 10px; border-radius: 5px; color: black; border: 2px solid red;">
         <strong>Debug Info:</strong><br>
         Round Results Length: {{ heardleStore.roundResults.length }}<br>
-        Actual Wins: {{ debugWinInfo.actualWins }}<br>
-        Store Wins: {{ debugWinInfo.storeWins }}<br>
-        Total Rounds: {{ debugWinInfo.totalRounds }}<br>
-        <span v-if="debugWinInfo.actualWins !== debugWinInfo.storeWins" style="color: red;">
-          ⚠️ MISMATCH DETECTED!
-        </span>
+        Raw Tournament Wins: {{ heardleStore.tournamentWins }}<br>
+        Manual Win Count: {{ heardleStore.roundResults.filter(r => r.hasWon).length }}<br>
+        Total Rounds Config: {{ heardleStore.tournamentConfig?.totalRounds || 0 }}<br>
+
+        <div style="margin-top: 10px;">
+          <strong>Individual Round Results:</strong><br>
+          <div v-for="(result, index) in heardleStore.roundResults" :key="index">
+            Round {{ index + 1 }}: {{ result.track.title }} - {{ result.hasWon ? 'WON' : 'LOST' }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
