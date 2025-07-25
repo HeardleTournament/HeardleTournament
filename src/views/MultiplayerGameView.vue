@@ -582,10 +582,8 @@ const proceedToNextRound = async () => {
         // Reset for next round
         const updatedPlayerGuesses = { ...gameState.value?.playerGuesses }
         Object.keys(updatedPlayerGuesses).forEach(playerId => {
-            // Increment roundsWon for players who won this round before resetting
-            if (updatedPlayerGuesses[playerId].hasWon) {
-                updatedPlayerGuesses[playerId].roundsWon = (updatedPlayerGuesses[playerId].roundsWon || 0) + 1
-            }
+            // No need to increment roundsWon here since it's already handled
+            // in firebaseLobbyService when the player makes a correct guess
 
             updatedPlayerGuesses[playerId] = {
                 ...updatedPlayerGuesses[playerId],
