@@ -764,6 +764,108 @@ const startGame = async () => {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
+/* Predefined Playlist Styles */
+.predefined-playlists {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.predefined-toggle {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.predefined-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.predefined-toggle::after {
+  content: '▼';
+  font-size: 0.8rem;
+  transition: transform 0.3s ease;
+}
+
+.predefined-toggle.open::after {
+  transform: rotate(180deg);
+}
+
+.predefined-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+  margin-top: 5px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.predefined-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.predefined-item:last-child {
+  border-bottom: none;
+}
+
+.predefined-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #2c3e50;
+  font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.predefined-btn:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  color: #667eea;
+}
+
+.predefined-btn.selected {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+  color: #667eea;
+  font-weight: 600;
+}
+
+.predefined-btn .playlist-name {
+  font-weight: 600;
+  color: inherit;
+}
+
+.predefined-btn .song-count {
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-weight: normal;
+}
+
+.predefined-btn.selected .song-count {
+  color: #667eea;
+}
+
 @media (max-width: 768px) {
   .lobby-view {
     padding: 10px;
@@ -797,6 +899,16 @@ const startGame = async () => {
   .settings-input,
   .settings-select {
     padding: 10px;
+    font-size: 0.9rem;
+  }
+
+  .predefined-toggle {
+    font-size: 0.9rem;
+    padding: 10px 14px;
+  }
+
+  .predefined-btn {
+    padding: 10px 14px;
     font-size: 0.9rem;
   }
 }
