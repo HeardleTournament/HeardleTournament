@@ -625,6 +625,7 @@ const startGame = async () => {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
+  color: #2c3e50;
 }
 
 .form-input:focus {
@@ -642,6 +643,11 @@ const startGame = async () => {
   background-color: #f8f9fa;
   color: #6c757d;
   cursor: not-allowed;
+}
+
+.form-input::placeholder {
+  color: #6c757d;
+  opacity: 1;
 }
 
 .form-hint {
@@ -662,12 +668,18 @@ const startGame = async () => {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
+  color: #2c3e50;
 }
 
 .settings-input:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.settings-input::placeholder {
+  color: #6c757d;
+  opacity: 1;
 }
 
 .settings-select {
