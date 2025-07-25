@@ -766,54 +766,37 @@ const startGame = async () => {
 
 /* Predefined Playlist Styles */
 .predefined-playlists {
-  position: relative;
-  margin-bottom: 15px;
+  margin-top: 1rem;
 }
 
 .predefined-toggle {
-  width: 100%;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: none;
   border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 1rem;
-  font-weight: 600;
+  color: #667eea;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  padding: 8px 0;
+  transition: color 0.3s ease;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  gap: 8px;
 }
 
 .predefined-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
-.predefined-toggle::after {
-  content: '';
-  font-size: 0.8rem;
-  transition: transform 0.3s ease;
+  color: #5a6fd8;
 }
 
 .predefined-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  overflow: hidden;
-  margin-top: 5px;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  margin-top: 1rem;
+  border: 2px solid #e0e6ed;
+  border-radius: 10px;
+  background: #f8f9fa;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .predefined-item {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #e0e6ed;
 }
 
 .predefined-item:last-child {
@@ -822,64 +805,42 @@ const startGame = async () => {
 
 .predefined-btn {
   width: 100%;
-  padding: 0;
-  background: transparent;
+  background: none;
   border: none;
+  padding: 1rem;
   text-align: left;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #2c3e50;
-  font-size: 0.95rem;
   display: block;
 }
 
 .predefined-btn:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
 }
 
 .predefined-btn.selected {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
-  color: #667eea;
-  font-weight: 600;
-}
-
-.playlist-info {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  background: rgba(102, 126, 234, 0.2);
+  border-left: 4px solid #667eea;
 }
 
 .playlist-info h4 {
-  margin: 0;
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
   font-size: 1rem;
   font-weight: 600;
-  color: inherit;
-  line-height: 1.3;
 }
 
 .playlist-info p {
-  margin: 0;
-  font-size: 0.85rem;
+  margin: 0 0 0.5rem 0;
   color: #6c757d;
-  line-height: 1.3;
-}
-
-.predefined-btn.selected .playlist-info p {
-  color: #667eea;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .playlist-meta {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: #adb5bd;
   font-weight: 500;
-  opacity: 0.8;
-}
-
-.predefined-btn.selected .playlist-meta {
-  color: #667eea;
-  opacity: 1;
 }
 
 @media (max-width: 768px) {
