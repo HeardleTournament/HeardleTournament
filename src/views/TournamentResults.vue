@@ -117,6 +117,11 @@
           🏠 Back to Menu
         </button>
       </div>
+
+      <!-- Debug info (only shows in development) -->
+      <div v-if="debugWinInfo" style="display: none;">
+        {{ debugWinInfo.actualWins }} vs {{ debugWinInfo.storeWins }}
+      </div>
     </div>
   </div>
 </template>
@@ -137,7 +142,19 @@ onMounted(() => {
     roundResultsLength: heardleStore.roundResults.length,
     isTournamentMode: heardleStore.isTournamentMode,
     currentRound: heardleStore.currentRound,
-    roundResults: heardleStore.roundResults
+    roundResults: heardleStore.roundResults,
+    tournamentWins: heardleStore.tournamentWins,
+    totalRounds: heardleStore.tournamentConfig?.totalRounds
+  })
+
+  // Debug: Log each round result to see if there are duplicates
+  heardleStore.roundResults.forEach((result, index) => {
+    console.log(`Round ${index + 1}:`, {
+      trackTitle: result.track.title,
+      hasWon: result.hasWon,
+      score: result.score,
+      attempts: result.attempts.length
+    })
   })
 
   // More lenient check - if we have tournament config and round results, show the results
@@ -162,6 +179,28 @@ const winPercentage = computed(() => {
   const total = heardleStore.tournamentConfig?.totalRounds || 0
   if (total === 0) return 0
   return Math.round((heardleStore.tournamentWins / total) * 100)
+})
+
+// Debug computed to help track the wins issue
+const debugWinInfo = computed(() => {
+  const roundResults = heardleStore.roundResults
+  const actualWins = roundResults.filter(r => r.hasWon).length
+  const storeWins = heardleStore.tournamentWins
+  const totalRounds = heardleStore.tournamentConfig?.totalRounds || 0
+
+  console.log('Debug win info:', {
+    roundResultsLength: roundResults.length,
+    actualWins,
+    storeWins,
+    totalRounds,
+    mismatch: actualWins !== storeWins
+  })
+
+  return {
+    actualWins,
+    storeWins,
+    totalRounds
+  }
 })
 
 const performanceRating = computed(() => {

@@ -475,6 +475,16 @@ export const useHeardleStore = defineStore('heardle', () => {
       return
     }
 
+    // Additional safety check: don't add duplicate tracks
+    const trackAlreadyExists = roundResults.value.some(result =>
+      result.track.id === currentTrack.value?.id &&
+      result.track.title === currentTrack.value?.title
+    )
+    if (trackAlreadyExists) {
+      console.warn('Attempted to add duplicate track to round results:', currentTrack.value?.title)
+      return
+    }
+
     // Save round result
     const roundResult: RoundResult = {
       track: { ...currentTrack.value },
