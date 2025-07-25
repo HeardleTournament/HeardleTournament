@@ -625,13 +625,9 @@ const endTournament = async () => {
     if (!isHost.value) return
 
     try {
-        // Before ending, increment roundsWon for players who won the final round
+        // No need to increment roundsWon here since it should already be handled
+        // when progressing through rounds in proceedToNextRound()
         const updatedPlayerGuesses = { ...gameState.value?.playerGuesses }
-        Object.keys(updatedPlayerGuesses).forEach(playerId => {
-            if (updatedPlayerGuesses[playerId].hasWon) {
-                updatedPlayerGuesses[playerId].roundsWon = (updatedPlayerGuesses[playerId].roundsWon || 0) + 1
-            }
-        })
 
         // Update game state to mark tournament as complete
         const result = await firebaseLobbyService.updateGameState({
