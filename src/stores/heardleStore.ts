@@ -83,7 +83,23 @@ export const useHeardleStore = defineStore('heardle', () => {
     }
   })
 
-  const tournamentWins = computed(() => roundResults.value.filter((r) => r.hasWon).length)
+  const tournamentWins = computed(() => {
+    const wins = roundResults.value.filter((r) => r.hasWon).length
+    const totalRounds = tournamentConfig.value?.totalRounds || 0
+
+    // Safety check to prevent impossible win counts
+    if (wins > totalRounds && totalRounds > 0) {
+      console.warn('Tournament wins exceed total rounds! This indicates a bug:', {
+        wins,
+        totalRounds,
+        roundResultsLength: roundResults.value.length,
+        roundResults: roundResults.value
+      })
+      return Math.min(wins, totalRounds)
+    }
+
+    return wins
+  })
   const tournamentAverageScore = computed(() => {
     if (roundResults.value.length === 0) return 0
     return Math.round(
@@ -400,6 +416,9 @@ export const useHeardleStore = defineStore('heardle', () => {
       totalRounds: tournamentConfig.value.totalRounds,
     })
 
+    // Reset round completion flag for the new round
+    currentRoundCompleted.value = false
+
     // Check if tournament is complete
     if (currentRound.value >= tournamentConfig.value.totalRounds) {
       console.log('Tournament already complete in startNextRound')
@@ -449,6 +468,13 @@ export const useHeardleStore = defineStore('heardle', () => {
     // Mark this round as completed to prevent duplicate calls
     currentRoundCompleted.value = true
 
+    // Safety check: don't add more rounds than configured
+    const maxRounds = tournamentConfig.value?.totalRounds || 0
+    if (roundResults.value.length >= maxRounds) {
+      console.warn('Attempted to add round result beyond configured tournament length')
+      return
+    }
+
     // Save round result
     const roundResult: RoundResult = {
       track: { ...currentTrack.value },
@@ -463,6 +489,7 @@ export const useHeardleStore = defineStore('heardle', () => {
 
     console.log('Round result saved:', roundResult)
     console.log('Total round results so far:', roundResults.value.length)
+    console.log('Tournament wins so far:', roundResults.value.filter((r) => r.hasWon).length)
 
     // Check if this was the last round
     if (currentRound.value >= (tournamentConfig.value?.totalRounds || 0)) {

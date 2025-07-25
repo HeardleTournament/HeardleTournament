@@ -26,7 +26,7 @@
             </div>
             <div class="tournament-stat">
               <span class="stat-label">Wins:</span>
-              <span class="stat-value">{{ heardleStore.tournamentWins }}/{{ heardleStore.currentRound - 1 }}</span>
+              <span class="stat-value">{{ heardleStore.tournamentWins }}/{{ heardleStore.roundResults.length }}</span>
             </div>
           </div>
         </div>
