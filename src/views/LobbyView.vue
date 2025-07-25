@@ -728,14 +728,16 @@ const startGame = async () => {
 }
 
 .action-btn {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
   border: none;
   padding: 15px 30px;
-  border-radius: 25px;
+  border-radius: 15px;
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
   min-width: 200px;
 }
 
@@ -745,7 +747,7 @@ const startGame = async () => {
 }
 
 .action-btn.secondary {
-  background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
   color: white;
 }
 
@@ -760,8 +762,8 @@ const startGame = async () => {
 }
 
 .action-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
 }
 
 /* Predefined Playlist Styles */
