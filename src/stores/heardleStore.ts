@@ -129,9 +129,9 @@ export const useHeardleStore = defineStore('heardle', () => {
     // Save previous game to appropriate storage if it exists
     if (currentTrack.value) {
       if (isTournamentMode.value) {
-        console.log('startNewGame: Previous game found in tournament mode - calling completeRound')
-        // In tournament mode, save to round results
-        completeRound()
+        console.log('startNewGame: Previous game found in tournament mode - round should already be completed')
+        // In tournament mode, round should already be completed by makeGuess/skipGuess/revealAnswer
+        // No need to call completeRound() here as it would cause duplicates
       } else {
         // In regular mode, save to game history
         saveGameToHistory()
