@@ -591,24 +591,29 @@ onBeforeRouteLeave(() => {
     border-bottom: none;
 }
 
-.predefined-btn {
+.lobby-view .predefined-btn {
     width: 100%;
-    background: none;
-    border: none;
-    padding: 1rem;
+    background: none !important;
+    border: none !important;
+    padding: 1rem !important;
     text-align: left;
     cursor: pointer;
     transition: all 0.3s ease;
     display: block;
+    color: inherit !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
 }
 
-.predefined-btn:hover {
-    background: rgba(102, 126, 234, 0.1);
+.lobby-view .predefined-btn:hover {
+    background: rgba(102, 126, 234, 0.1) !important;
+    color: inherit !important;
 }
 
-.predefined-btn.selected {
-    background: rgba(102, 126, 234, 0.2);
-    border-left: 4px solid #667eea;
+.lobby-view .predefined-btn.selected {
+    background: rgba(102, 126, 234, 0.2) !important;
+    border-left: 4px solid #667eea !important;
+    color: inherit !important;
 }
 
 .playlist-info h4 {
