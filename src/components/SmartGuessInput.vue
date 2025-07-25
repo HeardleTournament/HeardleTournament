@@ -222,6 +222,7 @@ defineExpose({
     font-size: 1em;
     transition: border-color 0.2s ease;
     background: white;
+    color: #2c3e50;
 }
 
 .guess-input:focus {
@@ -234,6 +235,11 @@ defineExpose({
     background: #f8f9fa;
     color: #6c757d;
     cursor: not-allowed;
+}
+
+.guess-input::placeholder {
+    color: #6c757d;
+    opacity: 1;
 }
 
 .suggestions-dropdown {
