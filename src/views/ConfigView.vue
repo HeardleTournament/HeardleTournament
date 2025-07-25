@@ -260,6 +260,7 @@ const startGame = () => {
   font-size: 1rem;
   transition: all 0.3s ease;
   background: white;
+  color: #2c3e50;
 }
 
 .form-input:focus,
@@ -281,6 +282,11 @@ const startGame = () => {
 .form-input:disabled:focus {
   border-color: #dee2e6;
   box-shadow: none;
+}
+
+.form-input::placeholder {
+  color: #6c757d;
+  opacity: 1;
 }
 
 .form-hint {

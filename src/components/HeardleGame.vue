@@ -650,9 +650,10 @@ const completeTournament = () => {
 }
 
 .attempts-list {
-  background: #f8f9fa;
+  background: #ffffff;
   border-radius: 6px;
   padding: 15px;
+  border: 1px solid #e9ecef;
 }
 
 .attempt-item {
@@ -670,11 +671,17 @@ const completeTournament = () => {
   font-weight: bold;
   margin-right: 10px;
   min-width: 20px;
+  color: #495057;
 }
 
 .attempt-guess {
   flex: 1;
   margin-right: 10px;
+  color: #2c3e50;
+}
+
+.attempt-result {
+  color: #495057;
 }
 
 .attempt-item.correct .attempt-guess {
