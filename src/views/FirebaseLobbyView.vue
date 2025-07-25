@@ -70,7 +70,7 @@
                                         <div class="playlist-info">
                                             <h4>{{ playlist.name }}</h4>
                                             <p>{{ playlist.description }}</p>
-                                            <span class="playlist-meta">{{ playlist.songCount }} • {{ playlist.genre
+                                            <span class="playlist-meta">{{ playlist.songCount }} songs • {{ playlist.genre
                                                 }}</span>
                                         </div>
                                     </button>
@@ -552,90 +552,83 @@ onBeforeRouteLeave(() => {
     background: #c53030;
 }
 
-/* Predefined Playlist Styles */
+/* Predefined Playlist Styles - Matching ConfigView */
+.predefined-playlists {
+    margin-top: 1rem;
+}
+
 .predefined-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
     background: none;
     border: none;
-    color: #4299e1;
-    cursor: pointer;
+    color: #667eea;
     font-size: 0.9rem;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+    cursor: pointer;
+    padding: 8px 0;
+    transition: color 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .predefined-toggle:hover {
-    background: rgba(66, 153, 225, 0.1);
+    color: #5a6fd8;
 }
 
-.predefined-playlists {
-    margin-top: 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #f7fafc;
-    padding: 12px;
-}
-
-.predefined-grid {
-    display: grid;
-    gap: 12px;
+.predefined-menu {
+    margin-top: 1rem;
+    border: 2px solid #e0e6ed;
+    border-radius: 10px;
+    background: #f8f9fa;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .predefined-item {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 12px;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    border-bottom: 1px solid #e0e6ed;
 }
 
-.predefined-item:hover {
-    border-color: #4299e1;
-    box-shadow: 0 2px 4px rgba(66, 153, 225, 0.1);
-}
-
-.predefined-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 8px;
-}
-
-.predefined-name {
-    font-weight: 600;
-    color: #2d3748;
-    margin: 0;
+.predefined-item:last-child {
+    border-bottom: none;
 }
 
 .predefined-btn {
-    background: #4299e1;
-    color: white;
+    width: 100%;
+    background: none;
     border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 0.85rem;
+    padding: 1rem;
+    text-align: left;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.3s ease;
+    display: block;
 }
 
 .predefined-btn:hover {
-    background: #3182ce;
+    background: rgba(102, 126, 234, 0.1);
 }
 
-.predefined-description {
-    color: #718096;
-    font-size: 0.9rem;
-    margin-bottom: 8px;
+.predefined-btn.selected {
+    background: rgba(102, 126, 234, 0.2);
+    border-left: 4px solid #667eea;
 }
 
-.predefined-meta {
-    display: flex;
-    gap: 12px;
-    font-size: 0.8rem;
-    color: #a0aec0;
+.playlist-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.playlist-info p {
+    margin: 0 0 0.5rem 0;
+    color: #6c757d;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.playlist-meta {
+    font-size: 0.75rem;
+    color: #adb5bd;
+    font-weight: 500;
 }
 
 @media (max-width: 768px) {
