@@ -3,7 +3,7 @@
         <div class="input-container">
             <input ref="inputRef" v-model="query" @input="onInput" @keydown="handleKeydown"
                 @focus="showSuggestions = true" @blur="handleBlur" :placeholder="placeholder" :disabled="disabled"
-                class="guess-input" autocomplete="off" />
+                type="text" class="guess-input" autocomplete="off" />
 
             <!-- Suggestions dropdown -->
             <div v-if="showSuggestions && filteredSuggestions.length > 0" class="suggestions-dropdown">
@@ -222,7 +222,7 @@ defineExpose({
     font-size: 1em;
     transition: border-color 0.2s ease;
     background: white;
-    color: #2c3e50;
+    color: #000000 !important;
 }
 
 .guess-input:focus {
@@ -240,6 +240,26 @@ defineExpose({
 .guess-input::placeholder {
     color: #6c757d;
     opacity: 1;
+}
+
+/* Additional specificity to ensure text color is applied */
+.smart-guess-input .input-container .guess-input {
+    color: #000000 !important;
+}
+
+/* Override any Pico CSS or other framework styles */
+.smart-guess-input .guess-input,
+.smart-guess-input input[type="text"] {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+/* Maximum specificity override for Pico CSS */
+.smart-guess-input .input-container input.guess-input,
+.smart-guess-input .input-container input[type="text"].guess-input {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    font-weight: normal !important;
 }
 
 .suggestions-dropdown {
