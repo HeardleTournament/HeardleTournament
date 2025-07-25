@@ -119,8 +119,15 @@
       </div>
 
       <!-- Debug info (only shows in development) -->
-      <div v-if="debugWinInfo" style="display: none;">
-        {{ debugWinInfo.actualWins }} vs {{ debugWinInfo.storeWins }}
+      <div v-if="debugWinInfo" style="background: #f0f0f0; padding: 10px; margin: 10px; border-radius: 5px; color: black;">
+        <strong>Debug Info:</strong><br>
+        Round Results Length: {{ heardleStore.roundResults.length }}<br>
+        Actual Wins: {{ debugWinInfo.actualWins }}<br>
+        Store Wins: {{ debugWinInfo.storeWins }}<br>
+        Total Rounds: {{ debugWinInfo.totalRounds }}<br>
+        <span v-if="debugWinInfo.actualWins !== debugWinInfo.storeWins" style="color: red;">
+          ⚠️ MISMATCH DETECTED!
+        </span>
       </div>
     </div>
   </div>
