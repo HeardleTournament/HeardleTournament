@@ -788,11 +788,19 @@ const handleGameStateChanges = (newGameState: MultiplayerGameState, previousTrac
     const allFinished = areAllPlayersFinished()
     const isRoundActiveAndStarted = newGameState.isRoundActive && newGameState.roundStartTime > 0
 
-    // Only show track info if the round is actually active and players have finished
+    // Show track info if the round is actually active and players have finished
     if (!showTrackInfo.value && currentTrack && isRoundActiveAndStarted && allFinished) {
         showTrackInfo.value = true
         console.log('[handleGameStateChanges] All players finished, showing track info/results')
-    } else {
+    }
+
+    // Also show track info if all players are finished and the round is no longer active (end of tournament case)
+    if (!showTrackInfo.value && !currentTrack && !newGameState.isRoundActive && allFinished) {
+        showTrackInfo.value = true
+        console.log('[handleGameStateChanges] All players finished and round inactive (end of tournament), showing track info/results')
+    }
+
+    if (!showTrackInfo.value) {
         console.log('[handleGameStateChanges] allFinished:', allFinished, 'showTrackInfo:', showTrackInfo.value, 'currentTrack:', currentTrack, 'isRoundActiveAndStarted:', isRoundActiveAndStarted)
     }
 }
