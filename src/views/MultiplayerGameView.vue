@@ -115,13 +115,28 @@
                     </div>
                 </div>
 
+
                 <!-- Player Round Completed Message -->
                 <div v-if="hasCurrentPlayerFinishedRound() && !hasCurrentPlayerWon() && !showTrackInfo"
                     class="round-completed-section">
                     <div class="completed-message">
                         <h3>🎵 Round Completed</h3>
-                        <p>You used all {{ gameState.maxAttempts }} attempts. Better luck next round!</p>
-                        <p>Wait for other players to finish or for the host to reveal the answer.</p>
+                        <p>You used all {{ gameState.maxAttempts }} attempts or gave up. Better luck next round!</p>
+                    </div>
+                    <div v-if="isHost && areAllPlayersFinished()" class="round-actions" style="margin-top: 20px;">
+                        <button v-if="gameState.currentRound < (gameSettings?.totalRounds || 5)" @click="nextRound"
+                            class="next-round-btn">
+                            ⏭️ Next Round ({{ gameState.currentRound + 1 }}/{{ gameSettings?.totalRounds || 5 }})
+                        </button>
+                        <button v-else @click="endTournament" class="end-tournament-btn">
+                            🏆 End Tournament
+                        </button>
+                    </div>
+                    <div v-else class="waiting-host" style="margin-top: 20px;">
+                        <p v-if="gameState.currentRound < (gameSettings?.totalRounds || 5)">
+                            Waiting for host to start next round...
+                        </p>
+                        <p v-else>Waiting for host to end the tournament...</p>
                     </div>
                 </div>
 
