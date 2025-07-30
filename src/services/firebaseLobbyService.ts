@@ -1,3 +1,4 @@
+// ...existing code...
 // Firebase-based lobby service for multiplayer functionality
 import { database } from '@/config/firebase'
 import { ref, set, get, onValue, remove, update, child } from 'firebase/database'
@@ -56,6 +57,29 @@ export interface LobbyData {
 }
 
 class FirebaseLobbyService {
+  // ...existing code...
+
+  // Reset the lobby for a new tournament (host only)
+  async resetLobby(): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || this.currentLobby.hostId !== this.currentPlayerId) {
+      return { success: false, error: 'Only host can reset lobby' }
+    }
+    try {
+      // Reset lobby status and remove gameState
+      const updates: { [key: string]: unknown } = {}
+      updates[`lobbies/${this.currentLobby!.id}/status`] = 'waiting'
+      updates[`lobbies/${this.currentLobby!.id}/gameState`] = null
+      // Set all players to not ready
+      Object.keys(this.currentLobby!.players).forEach((playerId) => {
+        updates[`lobbies/${this.currentLobby!.id}/players/${playerId}/isReady`] = false
+      })
+      await update(ref(database), updates)
+      return { success: true }
+    } catch (error) {
+      console.error('Error resetting lobby:', error)
+      return { success: false, error: 'Failed to reset lobby' }
+    }
+  }
   private currentLobby: LobbyData | null = null
   private currentPlayerId: string | null = null
   private lobbyListeners: { [path: string]: () => void } = {}

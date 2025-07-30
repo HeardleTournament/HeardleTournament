@@ -102,11 +102,15 @@ const backToLobby = async () => {
     const isCurrentUserHost = lobbyData.value?.hostId === currentPlayerId
 
     if (isCurrentUserHost) {
-        console.log('Host is resetting lobby for new tournament')
-        // TODO: Implement lobby reset functionality in Firebase service
-        // For now, just navigate back to lobby
-        console.log('Navigating back to lobby')
-        router.push(`/lobby/${lobbyCode.value}`)
+        // Reset the lobby for a new tournament
+        const result = await firebaseLobbyService.resetLobby()
+        if (!result.success) {
+            console.error('Failed to reset lobby:', result.error)
+        }
+        // Wait a moment to ensure lobby is reset before navigating
+        setTimeout(() => {
+            router.push(`/lobby/${lobbyCode.value}`)
+        }, 300)
     } else {
         // Non-host players just navigate back
         router.push(`/lobby/${lobbyCode.value}`)
