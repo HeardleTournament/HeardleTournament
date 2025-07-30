@@ -246,18 +246,7 @@ const showNextRoundConfirmation = ref(false)
 
 import { watch } from 'vue'
 
-// Computed property for reactivity
-const allPlayersFinished = computed(() => areAllPlayersFinished())
-
-// Ensure results are shown as soon as all players are finished
-watch([
-  allPlayersFinished,
-  () => showTrackInfo.value
-], ([allFinished, trackInfoShown]) => {
-  if (allFinished && !trackInfoShown) {
-    showTrackInfo.value = true
-  }
-})
+// Remove watcher; move logic into handleGameStateChanges for reliability
 
 // Computed properties
 const lobbyCode = computed(() => route.params.lobbyCode as string)
@@ -777,21 +766,13 @@ const setupRealtimeListeners = () => {
 const handleGameStateChanges = (newGameState: MultiplayerGameState, previousTrack?: { id: string; title: string; artist?: string; youtubeId: string } | null) => {
     const currentTrack = newGameState.currentTrack
 
-    // If track info should be shown (all players finished or round ended)
-    const allFinished = areAllPlayersFinished()
-    const isRoundActiveAndStarted = newGameState.isRoundActive && newGameState.roundStartTime > 0
-
-    // Only show track info if the round is actually active and players have finished
-    if (!showTrackInfo.value && currentTrack && isRoundActiveAndStarted && allFinished) {
-        showTrackInfo.value = true
-    }
-
     // If a new round started (track changed from something to null)
     if (previousTrack && !currentTrack) {
         showTrackInfo.value = false
         currentGuess.value = ''
         isPlaying.value = false
         isSubmittingGuess.value = false
+        console.log('[handleGameStateChanges] New round started, hiding track info')
     }
 
     // If a new track was set (round started)
@@ -800,6 +781,19 @@ const handleGameStateChanges = (newGameState: MultiplayerGameState, previousTrac
         currentGuess.value = ''
         isPlaying.value = false
         isSubmittingGuess.value = false
+        console.log('[handleGameStateChanges] Track set, round started, hiding track info')
+    }
+
+    // If track info should be shown (all players finished or round ended)
+    const allFinished = areAllPlayersFinished()
+    const isRoundActiveAndStarted = newGameState.isRoundActive && newGameState.roundStartTime > 0
+
+    // Only show track info if the round is actually active and players have finished
+    if (!showTrackInfo.value && currentTrack && isRoundActiveAndStarted && allFinished) {
+        showTrackInfo.value = true
+        console.log('[handleGameStateChanges] All players finished, showing track info/results')
+    } else {
+        console.log('[handleGameStateChanges] allFinished:', allFinished, 'showTrackInfo:', showTrackInfo.value, 'currentTrack:', currentTrack, 'isRoundActiveAndStarted:', isRoundActiveAndStarted)
     }
 }
 
