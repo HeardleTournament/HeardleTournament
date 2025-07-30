@@ -124,10 +124,6 @@
                         <p>You used all {{ gameState.maxAttempts }} attempts or gave up. Better luck next round!</p>
                     </div>
                     <div v-if="areAllPlayersFinished()">
-                        <script setup>
-                        // Ensure showTrackInfo is set to true for all players when all are finished
-                        if (!showTrackInfo.value) showTrackInfo.value = true;
-                        </script>
                         <p style="margin-top: 20px; color: #007bff; font-weight: 500;">All players have finished. Showing results...</p>
                     </div>
                     <div v-else class="waiting-host" style="margin-top: 20px;">
