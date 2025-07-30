@@ -127,18 +127,31 @@ onMounted(() => {
     firebaseLobbyService.listenToLobby(lobbyCode.value, (updatedLobby) => {
         if (updatedLobby) {
             lobbyData.value = updatedLobby
+            const currentPlayerId = firebaseLobbyService.getCurrentPlayerId()
             if (updatedLobby.status === 'waiting') {
-                // Lobby has been reset, go to lobby
-                router.push(`/lobby/${lobbyCode.value}`)
+                // Wait a moment for Firebase to sync, then check if player is still in lobby
+                setTimeout(() => {
+                    const stillInLobby = !!updatedLobby.players[currentPlayerId!]
+                    if (stillInLobby) {
+                        router.push(`/lobby/${lobbyCode.value}`)
+                    } else {
+                        // Player is not in lobby, go to menu
+                        router.push('/multiplayer')
+                    }
+                }, 400)
             } else if (updatedLobby.status === 'playing') {
-                // Game is still active, redirect to game view
                 router.push(`/lobby/${lobbyCode.value}/game`)
             } else if (updatedLobby.status !== 'finished') {
-                // Any other status, go to lobby
-                router.push(`/lobby/${lobbyCode.value}`)
+                setTimeout(() => {
+                    const stillInLobby = !!updatedLobby.players[currentPlayerId!]
+                    if (stillInLobby) {
+                        router.push(`/lobby/${lobbyCode.value}`)
+                    } else {
+                        router.push('/multiplayer')
+                    }
+                }, 400)
             }
         } else {
-            // Lobby was deleted or not found
             router.push('/multiplayer')
         }
     })
