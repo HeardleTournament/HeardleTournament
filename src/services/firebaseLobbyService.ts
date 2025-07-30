@@ -622,6 +622,28 @@ class FirebaseLobbyService {
       (snapshot) => {
         if (snapshot.exists()) {
           const gameState: MultiplayerGameState = snapshot.val()
+          // Hydrate playerGuesses for all players in the lobby
+          const lobby = this.currentLobby
+          if (lobby && lobby.players) {
+            if (!gameState.playerGuesses) gameState.playerGuesses = {}
+            Object.keys(lobby.players).forEach((playerId) => {
+              if (!gameState.playerGuesses[playerId]) {
+                gameState.playerGuesses[playerId] = {
+                  attempts: [],
+                  hasWon: false,
+                  hasLost: false,
+                  roundScore: 0,
+                  totalScore: 0,
+                  roundsWon: 0,
+                }
+              } else {
+                // Ensure attempts array exists
+                if (!Array.isArray(gameState.playerGuesses[playerId].attempts)) {
+                  gameState.playerGuesses[playerId].attempts = []
+                }
+              }
+            })
+          }
           callback(gameState)
         } else {
           callback(null)
