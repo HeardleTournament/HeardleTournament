@@ -1,5 +1,11 @@
 <template>
     <div class="multiplayer-game-view">
+        <!-- Return Home Button (always visible when game is loaded) -->
+        <div class="menu-button-container">
+            <button class="return-menu-btn" @click="showReturnHomeModal = true">
+                ← Return Home
+            </button>
+        </div>
         <div v-if="!gameState" class="loading-screen">
             <div class="loading-content">
                 <h2>Loading Game...</h2>
@@ -8,12 +14,6 @@
         </div>
 
         <div v-else class="game-container">
-            <!-- Return Home Button -->
-            <div class="menu-button-container">
-                <button class="return-menu-btn" @click="showReturnHomeModal = true">
-                    ← Return Home
-                </button>
-            </div>
         <!-- Return Home Confirmation Modal -->
         <div v-if="showReturnHomeModal" class="modal-overlay" @click="showReturnHomeModal = false">
             <div class="modal-content" @click.stop>
