@@ -244,6 +244,18 @@ const isStartingRound = ref(false)
 const showTrackInfo = ref(false)
 const showNextRoundConfirmation = ref(false)
 
+import { watch } from 'vue'
+
+// Ensure results are shown as soon as all players are finished
+watch([
+  () => areAllPlayersFinished(),
+  () => showTrackInfo.value
+], ([allFinished, trackInfoShown]) => {
+  if (allFinished && !trackInfoShown) {
+    showTrackInfo.value = true
+  }
+})
+
 // Computed properties
 const lobbyCode = computed(() => route.params.lobbyCode as string)
 const gameState = computed(() => lobbyData.value?.gameState)
