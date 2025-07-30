@@ -246,9 +246,12 @@ const showNextRoundConfirmation = ref(false)
 
 import { watch } from 'vue'
 
+// Computed property for reactivity
+const allPlayersFinished = computed(() => areAllPlayersFinished())
+
 // Ensure results are shown as soon as all players are finished
 watch([
-  () => areAllPlayersFinished(),
+  allPlayersFinished,
   () => showTrackInfo.value
 ], ([allFinished, trackInfoShown]) => {
   if (allFinished && !trackInfoShown) {
