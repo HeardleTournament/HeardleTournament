@@ -49,7 +49,7 @@ export const DEFAULT_PLAYLISTS: PlaylistConfig[] = [
     id: 'xenoblade-x',
     name: 'Xenoblade Chronicles X DE',
     description: 'Xenoblade Chronicles X Original Soundtrack and some DE tracks',
-    url: 'https://www.youtube.com/watch?v=5w4bOYDNypc&list=PLBB9dJggfb7WbUOESCXEb7YYPo3WpMXRJ',
+    url: 'https://www.youtube.com/watch?v=_DfjXNZ3sMA&list=PLP0B1G-EHwBqoWAxCrpBUy4LNrvlmuYP9',
     songCount: '63',
     genre: 'RPG/Anime',
     estimatedSongs: 63
@@ -58,7 +58,7 @@ export const DEFAULT_PLAYLISTS: PlaylistConfig[] = [
     id: 'xenoblade-trilogy',
     name: 'Xenoblade Chronicles Trilogy',
     description: 'Xenoblade Chronicles 1, 2 and 3 Original Soundtrack',
-    url: 'https://www.youtube.com/watch?v=d7V3M2DAq1E&list=PLBB9dJggfb7Wbe39v9kjUVk44U4i68F5u',
+    url: 'https://www.youtube.com/watch?v=d7V3M2DAq1E&list=PLP0B1G-EHwBoT6fL2Wg0H7cMJpku9-w-M',
     songCount: '360',
     genre: 'RPG/Anime',
     estimatedSongs: 360
