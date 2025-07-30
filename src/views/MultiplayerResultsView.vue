@@ -51,7 +51,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { firebaseLobbyService, type LobbyData } from '@/services/firebaseLobbyService'
 
@@ -122,27 +122,29 @@ const backToMenu = () => {
 }
 
 // Lifecycle
+// Listen to lobby changes and redirect appropriately
 onMounted(() => {
-    const currentLobby = firebaseLobbyService.getCurrentLobby()
-    if (currentLobby && currentLobby.id === lobbyCode.value) {
-        lobbyData.value = currentLobby
-
-        // Check if tournament is actually finished
-        if (currentLobby.status !== 'finished') {
-            console.log('Tournament not finished, redirecting based on status:', currentLobby.status)
-            if (currentLobby.status === 'playing') {
+    firebaseLobbyService.listenToLobby(lobbyCode.value, (updatedLobby) => {
+        if (updatedLobby) {
+            lobbyData.value = updatedLobby
+            if (updatedLobby.status === 'waiting') {
+                // Lobby has been reset, go to lobby
+                router.push(`/lobby/${lobbyCode.value}`)
+            } else if (updatedLobby.status === 'playing') {
                 // Game is still active, redirect to game view
                 router.push(`/lobby/${lobbyCode.value}/game`)
-            } else {
-                // Game hasn't started, redirect to lobby
+            } else if (updatedLobby.status !== 'finished') {
+                // Any other status, go to lobby
                 router.push(`/lobby/${lobbyCode.value}`)
             }
-            return
+        } else {
+            // Lobby was deleted or not found
+            router.push('/multiplayer')
         }
-    } else {
-        // Redirect to multiplayer menu if lobby not found
-        router.push('/multiplayer')
-    }
+    })
+})
+onUnmounted(() => {
+    firebaseLobbyService.removeAllListeners && firebaseLobbyService.removeAllListeners()
 })
 </script>
 
