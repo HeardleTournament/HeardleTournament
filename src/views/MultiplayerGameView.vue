@@ -203,6 +203,28 @@
                 </div>
             </div>
         </div>
+
+        <!-- Give Up Confirmation Modal -->
+        <div v-if="showGiveUpConfirmation" class="modal-overlay" @click="cancelGiveUp">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h3>❌ Give Up?</h3>
+                    <button @click="cancelGiveUp" class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to give up this round?</p>
+                    <p class="confirmation-text">You will receive 0 points for this round and cannot make more guesses.</p>
+                </div>
+                <div class="modal-actions">
+                    <button @click="cancelGiveUp" class="modal-btn cancel">
+                        Cancel
+                    </button>
+                    <button @click="confirmGiveUp" class="modal-btn confirm">
+                        Yes, Give Up
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -243,6 +265,7 @@ const isSubmittingGuess = ref(false)
 const isStartingRound = ref(false)
 const showTrackInfo = ref(false)
 const showNextRoundConfirmation = ref(false)
+const showGiveUpConfirmation = ref(false)
 
 import { watch } from 'vue'
 
@@ -577,24 +600,19 @@ const skipAttempt = async () => {
     await submitGuess('', true) // Empty guess with isSkip = true
 }
 
-const giveUp = async () => {
+const giveUp = () => {
     if (isSubmittingGuess.value || hasCurrentPlayerFinishedRound()) return
+    showGiveUpConfirmation.value = true
+}
 
-    // Ask for confirmation before giving up
-    const confirmed = window.confirm('Are you sure you want to give up this round? You will receive 0 points for this round.')
-    if (!confirmed) return
-
+const confirmGiveUp = async () => {
+    showGiveUpConfirmation.value = false
     isSubmittingGuess.value = true
-
     try {
-        // Submit a give up by setting the player as having lost the round
         const result = await firebaseLobbyService.giveUpRound()
-
         if (result.success) {
             currentGuess.value = ''
             refreshLobbyData()
-
-            // Check if all players have finished (won or lost)
             if (areAllPlayersFinished()) {
                 showTrackInfo.value = true
             }
@@ -606,6 +624,10 @@ const giveUp = async () => {
     } finally {
         isSubmittingGuess.value = false
     }
+}
+
+const cancelGiveUp = () => {
+    showGiveUpConfirmation.value = false
 }
 
 const nextRound = async () => {
@@ -709,8 +731,9 @@ const endTournament = async () => {
 
 // Handle keyboard events for modal
 const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && showNextRoundConfirmation.value) {
-        cancelNextRound()
+    if (event.key === 'Escape') {
+        if (showNextRoundConfirmation.value) cancelNextRound()
+        if (showGiveUpConfirmation.value) cancelGiveUp()
     }
 }
 
