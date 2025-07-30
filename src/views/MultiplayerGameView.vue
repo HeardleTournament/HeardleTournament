@@ -108,6 +108,10 @@
                             class="skip-btn">
                             Skip (+{{ getNextClipDuration() }}s)
                         </button>
+                        <button @click="giveUp" :disabled="isSubmittingGuess || hasCurrentPlayerFinishedRound()"
+                            class="give-up-btn">
+                            Give Up
+                        </button>
                     </div>
                 </div>
 
@@ -558,6 +562,37 @@ const checkGuessCorrectness = (guess: string, track: { title: string; artist?: s
 
 const skipAttempt = async () => {
     await submitGuess('', true) // Empty guess with isSkip = true
+}
+
+const giveUp = async () => {
+    if (isSubmittingGuess.value || hasCurrentPlayerFinishedRound()) return
+
+    // Ask for confirmation before giving up
+    const confirmed = window.confirm('Are you sure you want to give up this round? You will receive 0 points for this round.')
+    if (!confirmed) return
+
+    isSubmittingGuess.value = true
+
+    try {
+        // Submit a give up by setting the player as having lost the round
+        const result = await firebaseLobbyService.giveUpRound()
+
+        if (result.success) {
+            currentGuess.value = ''
+            refreshLobbyData()
+
+            // Check if all players have finished (won or lost)
+            if (areAllPlayersFinished()) {
+                showTrackInfo.value = true
+            }
+        } else {
+            console.error('Failed to give up round:', result.error)
+        }
+    } catch (error) {
+        console.error('Failed to give up round:', error)
+    } finally {
+        isSubmittingGuess.value = false
+    }
 }
 
 const nextRound = async () => {
@@ -1136,16 +1171,24 @@ onBeforeRouteLeave(() => {
 .guess-actions {
     text-align: center;
     margin-top: 15px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
 }
 
-.skip-btn {
-    background: #6c757d;
+.skip-btn,
+.give-up-btn {
     color: white;
     border: none;
     padding: 10px 20px;
     border-radius: 20px;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.skip-btn {
+    background: #6c757d;
 }
 
 .skip-btn:hover:not(:disabled) {
@@ -1154,6 +1197,21 @@ onBeforeRouteLeave(() => {
 }
 
 .skip-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.give-up-btn {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.give-up-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #c82333 0%, #a71e2a 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.give-up-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -1278,6 +1336,16 @@ onBeforeRouteLeave(() => {
         grid-template-columns: 1fr;
         text-align: center;
         gap: 8px;
+    }
+
+    .guess-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .skip-btn,
+    .give-up-btn {
+        width: 100%;
     }
 }
 

@@ -478,6 +478,91 @@ class FirebaseLobbyService {
     }
   }
 
+  // Give up the current round for the current player
+  async giveUpRound(): Promise<{ success: boolean; error?: string }> {
+    if (!this.currentLobby || !this.currentPlayerId) {
+      return { success: false, error: 'No active lobby or player ID' }
+    }
+
+    try {
+      // Get current game state
+      const gameStateRef = ref(database, `lobbies/${this.currentLobby.id}/gameState`)
+      const snapshot = await get(gameStateRef)
+
+      if (!snapshot.exists()) {
+        return { success: false, error: 'Game state not found' }
+      }
+
+      const gameState = snapshot.val() as MultiplayerGameState
+
+      // Ensure playerGuesses object exists
+      if (!gameState.playerGuesses) {
+        gameState.playerGuesses = {}
+      }
+
+      // Ensure this specific player's data exists
+      if (!gameState.playerGuesses[this.currentPlayerId]) {
+        gameState.playerGuesses[this.currentPlayerId] = {
+          attempts: [],
+          hasWon: false,
+          hasLost: false,
+          roundScore: 0,
+          totalScore: 0,
+          roundsWon: 0,
+        }
+      }
+
+      // Get a direct reference to the player's data
+      let playerGuesses = gameState.playerGuesses[this.currentPlayerId]
+
+      // Additional safety check - if playerGuesses is still undefined, recreate it
+      if (!playerGuesses) {
+        console.error(
+          'CRITICAL: playerGuesses is undefined after initialization! Player ID:',
+          this.currentPlayerId,
+        )
+        gameState.playerGuesses[this.currentPlayerId] = {
+          attempts: [],
+          hasWon: false,
+          hasLost: false,
+          roundScore: 0,
+          totalScore: 0,
+          roundsWon: 0,
+        }
+        playerGuesses = gameState.playerGuesses[this.currentPlayerId]
+      }
+
+      // Final safety check for attempts array
+      if (!playerGuesses.attempts) {
+        console.warn('Attempts array is missing, recreating it')
+        playerGuesses.attempts = []
+      }
+
+      // Mark player as having given up (lost the round)
+      playerGuesses.hasLost = true
+      playerGuesses.roundScore = 0
+
+      // Add a give up attempt to track the action
+      const giveUpAttempt = {
+        guess: '[GAVE UP]',
+        isCorrect: false,
+        timestamp: Date.now()
+      }
+      playerGuesses.attempts.push(giveUpAttempt)
+
+      // Update the specific player's guess data
+      const updates: { [key: string]: unknown } = {}
+      updates[`lobbies/${this.currentLobby.id}/gameState/playerGuesses/${this.currentPlayerId}`] =
+        playerGuesses
+
+      await update(ref(database), updates)
+      return { success: true }
+    } catch (error) {
+      console.error('Error giving up round:', error)
+      return { success: false, error: 'Failed to give up round' }
+    }
+  }
+
   // Calculate round score based on number of attempts
   private calculateRoundScore(attemptCount: number): number {
     const maxScore = 1000
